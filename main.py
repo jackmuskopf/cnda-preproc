@@ -41,10 +41,11 @@ def rot_ex():
 	im1.image.rotate_on_axis('x')
 	im1.animated_axes(collapse='max')
 
-im1 = ImageEditor(PETImage(f1,fpath),nmice=2)
-im2 = ImageEditor(PETImage(f2,fpath),nmice=2)
-im3 = ImageEditor(PETImage(f3,fpath),nmice=4)
+im1 = ImageEditor(PETImage(f1,fpath),nmice=2,escale=14.0)
+im2 = ImageEditor(PETImage(f2,fpath),nmice=2,escale=100.0)
+im3 = ImageEditor(PETImage(f3,fpath),nmice=4,escale=100.0)
+im3.image.load_image()
+im3.animate_axes()
 
-for im in [im1,im2,im3]:
-	im.escale=14.0
-	im.collapse='max'
+im2.image.load_image()
+im2.animate_axes()

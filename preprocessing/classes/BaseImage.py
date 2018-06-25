@@ -30,7 +30,7 @@ class BaseImage:
 
     def check_data(self):
         if self.img_data is None:
-            raise ValueError('self.img_data has not been intialized. Use self.read_images')
+            raise ValueError('self.img_data has not been intialized. Use image.load_image()')
    
     def check_collapse_method(self,method):
         if method not in ['sum','mean','max']:

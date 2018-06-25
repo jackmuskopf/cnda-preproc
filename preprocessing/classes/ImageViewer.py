@@ -6,7 +6,7 @@ from .BaseImage import PETImage, SubPET
 
 class ImageViewer:
 
-	def __init__(self, image=None, collapse='max', exposure_scale=1):
+	def __init__(self, image=None, collapse='max', escale=1.0):
 		self.image = image    # data_handler.MyImage superclass
 
 		# toggle for animation
@@ -17,7 +17,7 @@ class ImageViewer:
 		self.cy = 64
 
 		# scaling to use when displaying images
-		self.escale = exposure_scale
+		self.escale = escale
 
 		# method of collapsing axes for 2d viewing of 3d data
 		self.collapse = collapse
@@ -26,6 +26,7 @@ class ImageViewer:
 		return [k for k,v in self.image.ax_map.items() if v==ax][0]=='x'
 
 	def check_frames(self):
+		self.image.check_data()
 		if self.image.nframes <= 1:
 			warnings.warn('{} frame(s) loaded into image.  Cannot animate'.format(self.image.nframes))
 
@@ -149,8 +150,8 @@ class ImageViewer:
 
 class ImageEditor(ImageViewer):
 
-	def __init__(self, image, nmice):
-		ImageViewer.__init__(self, image)
+	def __init__(self, image, nmice, collapse='max', escale=1.0):
+		ImageViewer.__init__(self, image, collapse=collapse, escale=escale)
 
 		# for displaying cut
 		self.line_map = {4:2, 3:2, 2:1, 1:0}
@@ -158,7 +159,7 @@ class ImageEditor(ImageViewer):
 			raise ValueError('Unexpected nmice: {}'.format(nmice))
 		self.nmice = nmice
 
-	def animated_axes(self, collapse='sum',interval=100):
+	def animate_axes(self, collapse='sum',interval=100):
 		def genIx():
 			dt = 1
 			t = 0
@@ -193,11 +194,11 @@ class ImageEditor(ImageViewer):
 
 		# swap x axes (for visualization)
 		xmats = self.swapX(xmats)
-
 		if len(xmats)==1 or len(ymats)==1 or len(zmats)==1:
 			xmats = xmats+xmats
 			ymats = ymats+ymats
 			zmats = zmats+zmats
+			nframes = 2
 
 		self.cx,self.cy = (64,64)
 		self.pause = False
