@@ -51,19 +51,19 @@ class ImageViewer:
 		fig.canvas.mpl_connect('key_press_event', onKey)
 		fig.canvas.mpl_connect('button_press_event', onClick)
 
-	def view_each_axis(self, frame_range=None, collapse='sum'):
+	def view_each_axis(self, frame_range=None):
 		if frame_range is None:
 			# collapse over frames using sum or max
-			frame = self.image.collapse_over_frames(method=collapse)
+			frame = self.image.collapse_over_frames(method=self.collapse)
 		else:
 			fs = range(frame_range[0],frame_range[1]+1)
 			frames = np.stack([self.image.get_frame(k) for k in fs],axis=-1)
-			frame = self.image.collapse_over_frames(method=collapse,matrix=frames)
+			frame = self.image.collapse_over_frames(method=self.collapse,matrix=frames)
 		
 		# collapse and scale frame
-		xmat = getattr(frame,collapse)(axis=self.image.get_axis('x')).swapaxes(0,1)
-		ymat = getattr(frame,collapse)(axis=self.image.get_axis('y'))
-		zmat = getattr(frame,collapse)(axis=self.image.get_axis('z'))
+		xmat = getattr(frame,self.collapse)(axis=self.image.get_axis('x')).swapaxes(0,1)
+		ymat = getattr(frame,self.collapse)(axis=self.image.get_axis('y'))
+		zmat = getattr(frame,self.collapse)(axis=self.image.get_axis('z'))
 		xmat = xmat*(self.escale/xmat.max())
 		ymat = ymat*(self.escale/ymat.max())
 		zmat = zmat*(self.escale/zmat.max())
@@ -92,11 +92,11 @@ class ImageViewer:
 			frames = self.swapX(frames)
 		return frames
 
-	def animate_collapse(self,view_ax, method='sum'):
+	def animate_collapse(self,view_ax):
 		self.check_frames()
 		view_ax = self.image.get_axis(view_ax)
 		f1,f2 = self.image.frame_range
-		mats = [self.image.collapse_frame(axis=view_ax,frame=ix,method=method) for ix in range(f1,f2+1)]
+		mats = [self.image.collapse_frame(axis=view_ax,frame=ix,method=self.collapse) for ix in range(f1,f2+1)]
 		scale = self.escale/np.array(mats).max()
 		mats = [m*scale for m in mats]
 		if self.is_x(view_ax):
@@ -147,19 +147,8 @@ class ImageViewer:
 		    repeat=True)
 		plt.show()
 
-
-class ImageEditor(ImageViewer):
-
-	def __init__(self, image, nmice, collapse='max', escale=1.0):
-		ImageViewer.__init__(self, image, collapse=collapse, escale=escale)
-
-		# for displaying cut
-		self.line_map = {4:2, 3:2, 2:1, 1:0}
-		if nmice not in [1,2,3,4]:
-			raise ValueError('Unexpected nmice: {}'.format(nmice))
-		self.nmice = nmice
-
-	def animate_axes(self, collapse='sum',interval=100):
+		
+	def animate_axes(self, interval=100):
 		def genIx():
 			dt = 1
 			t = 0
@@ -178,9 +167,9 @@ class ImageEditor(ImageViewer):
 		# prevents error in matplotlib.animation if only one image
 		img_data = self.image.img_data
 		nframes = img_data.shape[-1]
-		xblock = getattr(img_data,collapse)(axis=self.image.get_axis('x'))
-		yblock = getattr(img_data,collapse)(axis=self.image.get_axis('y'))
-		zblock = getattr(img_data,collapse)(axis=self.image.get_axis('z'))
+		xblock = getattr(img_data,self.collapse)(axis=self.image.get_axis('x'))
+		yblock = getattr(img_data,self.collapse)(axis=self.image.get_axis('y'))
+		zblock = getattr(img_data,self.collapse)(axis=self.image.get_axis('z'))
 		
 		# normalize blocks
 		xblock = (self.escale/xblock.max())*xblock
@@ -228,6 +217,21 @@ class ImageEditor(ImageViewer):
 		ani = animation.FuncAnimation(fig, genAni, genIx, blit=True, interval=interval,
 		    repeat=True)
 		plt.show()
+
+
+
+
+class ImageEditor(ImageViewer):
+
+	def __init__(self, image, nmice, collapse='max', escale=1.0):
+		ImageViewer.__init__(self, image, collapse=collapse, escale=escale)
+
+		# for displaying cut
+		self.line_map = {4:2, 3:2, 2:1, 1:0}
+		if nmice not in [1,2,3,4]:
+			raise ValueError('Unexpected nmice: {}'.format(nmice))
+		self.nmice = nmice
+
 
 
 

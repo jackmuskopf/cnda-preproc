@@ -15,37 +15,30 @@ f2 = 'mpet3724a_em1_v1.pet'
 f1 = 'mpet3630a_em1_v1.pet'
 
 def do_f1():
-	myimg = PETImage(f1,fpath)
-	myimg.load_image()
-	ie = ImageEditor(myimg,nmice=2)
-	# ie.animated_cutter(view_ax='y',exposure_scale=14.0,method='collapse',interval=50)
-	frames = ie.animate_collapse('y',method='max')
-	ie.do_animation(frames,interval=50)
+	if im1.image.img_data is None:
+		im1.image.load_image()
+	frames = im1.animate_collapse('y')
+	im1.do_animation(frames,interval=50)
 
 def do_f2():
-	myimg = PETImage(f2,fpath)
-	myimg.load_image()
-	ie = ImageEditor(myimg,nmice=2)
-	ie.animated_cutter(view_ax='y',method='collapse',interval=50)
+	if im2.image.img_data is None:
+		im2.image.load_image()
+	im2.animated_cutter(view_ax='y',method='collapse',interval=50)
 
 
 def do_f3():
-	myimg = PETImage(f3,fpath)
-	myimg.load_image()
-	ie = ImageEditor(myimg,nmice=4)
-	ie.animated_cutter(view_ax='z',method='each_slice',interval=10)
+	if im3.image.img_data is None:
+		im3.image.load_image()
+	im3.animated_cutter(view_ax='z',method='each_slice',interval=50)
 
 def rot_ex():
-	im1.image.load_image()
-	im1.animated_axes(collapse='max')
+	if im1.image.img_data is None:
+		im1.image.load_image()
+	im1.animate_axes()
 	im1.image.rotate_on_axis('x')
-	im1.animated_axes(collapse='max')
+	im1.animate_axes()
 
 im1 = ImageEditor(PETImage(f1,fpath),nmice=2,escale=14.0)
-im2 = ImageEditor(PETImage(f2,fpath),nmice=2,escale=100.0)
-im3 = ImageEditor(PETImage(f3,fpath),nmice=4,escale=100.0)
-im3.image.load_image()
-im3.animate_axes()
+im2 = ImageEditor(PETImage(f2,fpath),nmice=2,escale=14.0)
+im3 = ImageEditor(PETImage(f3,fpath),nmice=4,escale=14.0)
 
-im2.image.load_image()
-im2.animate_axes()
