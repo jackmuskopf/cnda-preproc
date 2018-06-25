@@ -19,29 +19,32 @@ def do_f1():
 	myimg.load_image()
 	ie = ImageEditor(myimg,nmice=2)
 	# ie.animated_cutter(view_ax='y',exposure_scale=14.0,method='collapse',interval=50)
-	frames = ie.animate_collapse('y',exposure_scale=14.0,method='max')
+	frames = ie.animate_collapse('y',method='max')
 	ie.do_animation(frames,interval=50)
 
 def do_f2():
 	myimg = PETImage(f2,fpath)
 	myimg.load_image()
 	ie = ImageEditor(myimg,nmice=2)
-	ie.animated_cutter(view_ax='y',exposure_scale=14.0,method='collapse',interval=50)
+	ie.animated_cutter(view_ax='y',method='collapse',interval=50)
 
 
 def do_f3():
 	myimg = PETImage(f3,fpath)
 	myimg.load_image()
 	ie = ImageEditor(myimg,nmice=4)
-	ie.animated_cutter(view_ax='z',exposure_scale=100.0,method='each_slice',interval=10)
+	ie.animated_cutter(view_ax='z',method='each_slice',interval=10)
 
 def rot_ex():
 	im1.image.load_image()
-	im1.animated_axes(collapse='max',exposure_scale=14.0)
+	im1.animated_axes(collapse='max')
 	im1.image.rotate_on_axis('x')
-	im1.animated_axes(collapse='max',exposure_scale=14.0)
+	im1.animated_axes(collapse='max')
 
 im1 = ImageEditor(PETImage(f1,fpath),nmice=2)
 im2 = ImageEditor(PETImage(f2,fpath),nmice=2)
 im3 = ImageEditor(PETImage(f3,fpath),nmice=4)
 
+for im in [im1,im2,im3]:
+	im.exposure_scale=14.0
+	im.collapse='max'

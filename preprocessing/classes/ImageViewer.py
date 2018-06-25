@@ -6,7 +6,7 @@ from .BaseImage import PETImage, SubPET
 
 class ImageViewer:
 
-	def __init__(self, image=None):
+	def __init__(self, image=None, collapse='max', exposure_scale=1):
 		self.image = image    # data_handler.MyImage superclass
 
 		# toggle for animation
@@ -15,6 +15,12 @@ class ImageViewer:
 		# cut coords (only used in ImageEditor)
 		self.cx = 64
 		self.cy = 64
+
+		# scaling to use when displaying images
+		self.escale = exposure_scale
+
+		# method of collapsing axes for 2d viewing of 3d data
+		self.collapse = collapse
 
 	def is_x(self,ax):
 		return [k for k,v in self.image.ax_map.items() if v==ax][0]=='x'
@@ -44,7 +50,7 @@ class ImageViewer:
 		fig.canvas.mpl_connect('key_press_event', onKey)
 		fig.canvas.mpl_connect('button_press_event', onClick)
 
-	def view_each_axis(self, frame_range=None, collapse='sum', exposure_scale=1.0):
+	def view_each_axis(self, frame_range=None, collapse='sum'):
 		if frame_range is None:
 			# collapse over frames using sum or max
 			frame = self.image.collapse_over_frames(method=collapse)
@@ -57,9 +63,9 @@ class ImageViewer:
 		xmat = getattr(frame,collapse)(axis=self.image.get_axis('x')).swapaxes(0,1)
 		ymat = getattr(frame,collapse)(axis=self.image.get_axis('y'))
 		zmat = getattr(frame,collapse)(axis=self.image.get_axis('z'))
-		xmat = xmat*(exposure_scale/xmat.max())
-		ymat = ymat*(exposure_scale/ymat.max())
-		zmat = zmat*(exposure_scale/zmat.max())
+		xmat = xmat*(self.escale/xmat.max())
+		ymat = ymat*(self.escale/ymat.max())
+		zmat = zmat*(self.escale/zmat.max())
 
 		# plot with control
 		ax_title = {0:'x axis', 1:'y axis', 2:'z axis'}
@@ -75,32 +81,32 @@ class ImageViewer:
 		plt.show()
 
 
-	def animate_slice(self,view_ax,slice_ix,exposure_scale=1):
+	def animate_slice(self,view_ax,slice_ix):
 		self.check_frames()
 		view_ax = self.image.get_axis(view_ax)
 		frames = np.take(self.image.img_data, slice_ix, view_ax)
-		frames = exposure_scale*frames/frames.max()
+		frames = self.escale*frames/frames.max()
 		frames = self.image.split_on_axis(frames,2)
 		if self.is_x(view_ax):
 			frames = self.swapX(frames)
 		return frames
 
-	def animate_collapse(self,view_ax,exposure_scale=1, method='sum'):
+	def animate_collapse(self,view_ax, method='sum'):
 		self.check_frames()
 		view_ax = self.image.get_axis(view_ax)
 		f1,f2 = self.image.frame_range
 		mats = [self.image.collapse_frame(axis=view_ax,frame=ix,method=method) for ix in range(f1,f2+1)]
-		scale = exposure_scale/np.array(mats).max()
+		scale = self.escale/np.array(mats).max()
 		mats = [m*scale for m in mats]
 		if self.is_x(view_ax):
 			mats = self.swapX(mats)
 		return mats
 
-	def animate_along_axis(self,axis,frame=None,exposure_scale=1):
+	def animate_along_axis(self,axis,frame=None):
 		if frame is None:
 			frame = self.image.frame_range[0]
 		frame_mat = self.image.get_frame(frame)
-		scale = exposure_scale/frame_mat.max()
+		scale = self.escale/frame_mat.max()
 		frame_mat = frame_mat*scale
 		mats = self.image.split_on_axis(frame_mat, axis)
 		return mats
@@ -152,7 +158,7 @@ class ImageEditor(ImageViewer):
 			raise ValueError('Unexpected nmice: {}'.format(nmice))
 		self.nmice = nmice
 
-	def animated_axes(self, collapse='sum',exposure_scale=1.0,interval=100):
+	def animated_axes(self, collapse='sum',interval=100):
 		def genIx():
 			dt = 1
 			t = 0
@@ -176,9 +182,9 @@ class ImageEditor(ImageViewer):
 		zblock = getattr(img_data,collapse)(axis=self.image.get_axis('z'))
 		
 		# normalize blocks
-		xblock = (exposure_scale/xblock.max())*xblock
-		yblock = (exposure_scale/yblock.max())*yblock
-		zblock = (exposure_scale/zblock.max())*zblock
+		xblock = (self.escale/xblock.max())*xblock
+		yblock = (self.escale/yblock.max())*yblock
+		zblock = (self.escale/zblock.max())*zblock
 
 		# split into list of matrices
 		xmats = self.image.split_on_axis(xblock,2)
@@ -224,7 +230,7 @@ class ImageEditor(ImageViewer):
 
 
 
-	def animated_cutter(self, view_ax='z', method='collapse', frame_range=None, exposure_scale=1, slice_ix=None, interval=100):
+	def animated_cutter(self, view_ax='z', method='collapse', frame_range=None, slice_ix=None, interval=100):
 
 		def genIx():
 			dt = 1
@@ -257,17 +263,16 @@ class ImageEditor(ImageViewer):
 			frame_range = self.image.frame_range
 
 		if method == 'collapse':	# add frame_range info
-			mats = self.animate_collapse(view_ax=view_ax,exposure_scale=exposure_scale)
+			mats = self.animate_collapse(view_ax=view_ax)
 		elif method == 'slice':		# add frame_range info
 			if slice_ix is None:
 				print('No slice index indicated. Using 0.')
 				slice_ix = 0
 			mats = self.animate_slice(view_ax=view_ax,
-								slice_ix=slice_ix,
-								exposure_scale=exposure_scale)
+								slice_ix=slice_ix)
 		else:
 			frames = range(frame_range[0],frame_range[1]+1)
-			mat_groups = [self.animate_along_axis(view_ax,frame=f,exposure_scale=exposure_scale) for f in frames]
+			mat_groups = [self.animate_along_axis(view_ax,frame=f) for f in frames]
 			mats = [mat for group in mat_groups for mat in group]
 
 		# prevents error in matplotlib.animation if only one image
