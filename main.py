@@ -23,7 +23,7 @@ def do_f1():
 def do_f2():
 	if im2.image.img_data is None:
 		im2.image.load_image()
-	im2.animated_cutter(view_ax='y',method='collapse',interval=50)
+	im2.animated_cutter(view_ax='y',method='collapse',interval=150)
 
 
 def do_f3():
@@ -40,5 +40,5 @@ def rot_ex():
 
 im1 = ImageEditor(PETImage(f1,fpath),nmice=2,escale=14.0)
 im2 = ImageEditor(PETImage(f2,fpath),nmice=2,escale=14.0)
-im3 = ImageEditor(PETImage(f3,fpath),nmice=4,escale=14.0)
+im3 = ImageEditor(PETImage(f3,fpath),nmice=4,escale=24.0)
 

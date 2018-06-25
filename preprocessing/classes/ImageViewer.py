@@ -45,7 +45,7 @@ class ImageViewer:
 		    	plt.close()
 
 		def onClick(event):
-			self.cx,self.cy = (event.xdata,event.ydata)
+			self.cx,self.cy = (int(round(event.xdata)),int(round(event.ydata)))
 			print(self.cx,self.cy)
 
 		fig.canvas.mpl_connect('key_press_event', onKey)
