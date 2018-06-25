@@ -42,3 +42,11 @@ im1 = ImageEditor(PETImage(f1,fpath),nmice=2,escale=14.0)
 im2 = ImageEditor(PETImage(f2,fpath),nmice=2,escale=14.0)
 im3 = ImageEditor(PETImage(f3,fpath),nmice=4,escale=24.0)
 
+im3.image.load_image()
+
+im3.animated_cutter()
+
+(tl,tr,bl,br) = im3.cut_image()
+
+tlv = ImageEditor(tl,nmice=1,escale=14.0)
+tlv.do_animation(tlv.animate_along_axis('z'))

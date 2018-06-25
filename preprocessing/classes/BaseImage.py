@@ -82,10 +82,13 @@ class BaseImage:
 
 class SubPET(BaseImage):
 
-    def __init__(self, fileprefix, img_data=None):
+    def __init__(self, fileprefix, parent_image, img_data):
 
         BaseImage.__init__(self, fileprefix, img_data)
-        self.bounds={0:(128,128),1:(128,159),2:(159,128)}
+        self.parent_image = parent_image
+        self.frame_range = parent_image.frame_range
+        self.plane_range = parent_image.plane_range
+        self.scaled = parent_image.scaled
 
 
 
@@ -114,6 +117,8 @@ class PETImage(BaseImage):
 
         self.bounds={0:(128,128),1:(128,159),2:(159,128)}
         self.scaled = None
+
+        self.children = None
 
 
 
