@@ -46,5 +46,5 @@ im2 = ImageEditor(PETImage(f2,fpath),nmice=2)
 im3 = ImageEditor(PETImage(f3,fpath),nmice=4)
 
 for im in [im1,im2,im3]:
-	im.exposure_scale=14.0
+	im.escale=14.0
 	im.collapse='max'
