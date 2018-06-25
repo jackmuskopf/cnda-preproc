@@ -1,11 +1,11 @@
-
+import os
+import sys
 import struct
 import numpy as np
 from collections import namedtuple
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import warnings
-import sys
 
 
 class BaseImage:
@@ -100,11 +100,9 @@ class PETImage(BaseImage):
 
         self.params = None
 
-        if not filepath.endswith('/') and filepath != '':
-            filepath += '/'
         self.filepath = filepath
-        self.header_file = filepath+fileprefix+'.img.hdr'
-        self.data_file = filepath+fileprefix+'.img'
+        self.header_file = os.path.join(filepath,fileprefix+'.img.hdr')
+        self.data_file = os.path.join(filepath,fileprefix+'.img')
         self.load_header()  # initialize params
         self.xdim = self.params.x_dimension
         self.ydim = self.params.y_dimension

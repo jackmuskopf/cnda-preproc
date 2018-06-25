@@ -9,6 +9,11 @@ from preprocessing.settings import *
 ## f3 : 4 mice, 1 frame
 ## f2 : 2 mice
 ## f1 : 2 mice, 40 frames
+
+f3 = 'mpet3745a_em1_v1.pet'
+f2 = 'mpet3724a_em1_v1.pet'
+f1 = 'mpet3630a_em1_v1.pet'
+
 def do_f1():
 	myimg = PETImage(f1,fpath)
 	myimg.load_image()

@@ -1,8 +1,8 @@
-# ignore settings.py
-cnda-preproc/settings.py
-
 # ignore all .pyc
 *.pyc
 
 # ignore all __pycache__
 __pycache__/
+
+# ignore all data
+data/
