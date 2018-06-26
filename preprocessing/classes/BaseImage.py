@@ -89,6 +89,11 @@ class SubPET(BaseImage):
         self.frame_range = parent_image.frame_range
         self.plane_range = parent_image.plane_range
         self.scaled = parent_image.scaled
+        shape = self.img_data.shape
+        self.zdim, self.ydim, self.xdim, self.nframes = shape
+        self.bounds={0 : (self.ydim, self.xdim), 
+                    1 : (self.xdim, self.zdim),
+                    2 : (self.zdim, self.ydim)}
 
 
 
@@ -115,7 +120,9 @@ class PETImage(BaseImage):
         self.plane_range = None
         self.nframes = None
 
-        self.bounds={0:(128,128),1:(128,159),2:(159,128)}
+        self.bounds={0 : (self.ydim, self.xdim), 
+                    1 : (self.xdim, self.zdim),
+                    2 : (self.zdim, self.ydim)}
         self.scaled = None
 
         self.children = None
