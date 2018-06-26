@@ -46,8 +46,9 @@ class ImageViewer:
 		    	plt.close()
 
 		def onClick(event):
-			self.cx,self.cy = (int(round(event.xdata)),int(round(event.ydata)))
-			print(self.cx,self.cy)
+			if event.xdata is not None and event.ydata is not None:
+				self.cx,self.cy = (int(round(event.xdata)),int(round(event.ydata)))
+				print(self.cx,self.cy)
 
 		fig.canvas.mpl_connect('key_press_event', onKey)
 		fig.canvas.mpl_connect('button_press_event', onClick)
@@ -293,6 +294,9 @@ class ImageEditor(ImageViewer):
 		view_ax = self.image.get_axis(view_ax)
 		bx,by = self.image.bounds[view_ax]
 
+		if self.nmice > 2 and view_ax !=0:
+			raise ValueError('Must cut images with {} mice via z-axis view.'.format(self.nmice))
+
 		fig = plt.figure()
 
 		ax = fig.add_subplot(111)
@@ -374,7 +378,7 @@ class ImageEditor(ImageViewer):
 		def genAni(k):
 			f_img[0].set_array(fmats[k])
 			for j,im in enumerate(imgs):
-				im.set_array(cut_list[j][k])
+				im.set_array(cuts[j][k])
 			return all_imgs
 
 		if self.image.cuts is None:
@@ -392,7 +396,7 @@ class ImageEditor(ImageViewer):
 		nframes = len(fmats)
 
 		cuts = self.image.cuts
-		cut_list = [cut.img_data for cut in cuts]
+		cuts = [cut.img_data for cut in cuts]
 		
 		# join data if necessary
 		if self.nmice == 4 and axis in [1,2]:
@@ -404,44 +408,50 @@ class ImageEditor(ImageViewer):
 				cuts = [np.concatenate([cuts[0],cuts[1]],axis=2),np.concatenate([cuts[2],cuts[3]],axis=2)]	
 
 
-		cut_list = [getattr(img_data,self.collapse)(axis=axis)*scale for img_data in cut_list]
-		cut_list = [split_frames(img_data) for img_data in cut_list]
+		cuts = [getattr(img_data,self.collapse)(axis=axis)*scale for img_data in cuts]
+		cuts = [split_frames(img_data) for img_data in cuts]
 		
 		if len(fmats) == 1:
 			fmats = fmats + fmats
-			cut_list = [frames+frames for frames in cut_list]
+			cuts = [frames+frames for frames in cuts]
 			nframes = 2
 		
 		if self.is_x(axis):
 			fmats = self.swap_x(fmats)
-			cut_list = [self.swap_x(frames) for frames in cut_list]
+			cuts = [self.swap_x(frames) for frames in cuts]
 
 		# plotting
 		fig = plt.figure()
-		grid = gridspec.GridSpec(2,4)
-		full_ax = plt.subplot(grid[:,2:])
+		shapes = [cl[0].shape for cl in cuts]	# for grid formatting
 		if self.nmice == 2:
+			w1,w2 = shapes[0][1],shapes[1][1]
+			grid = gridspec.GridSpec(2,4,width_ratios=[w1,w2,w1,w2])
 			if axis not in [0,1]:
 				raise ValueError('Invalid view axis for nmice = 2 in animate_cuts: {}'.format(view_ax))
-			plt_nrows = 1
-			plt_ncols = 2 
 			axes = [plt.subplot(grid[:,0]), plt.subplot(grid[:,1])]	# tall in half
 
 		# todo: animation
 		elif self.nmice == 4:
-			plt_map = {0:(2,2),1:(1,2),2:(2,1)}
-			plt_ncols,plt_nrows = plt_map[axis]
-			if axis == 0:
-				axes = [plt.subplot(grid[k//2,k%2]) for k in range(4)]	# quadrants
+			if axis == 0:								# quadrants
+				w1,w2 = shapes[0][1],shapes[1][1]
+				w3 = (w1+w2)/2
+				h1,h2 = shapes[0][0],shapes[2][0]			
+				grid = gridspec.GridSpec(2, 4, height_ratios=[h1,h2], width_ratios=[w1,w2,w3,w3])				
+				axes = [plt.subplot(grid[k//2,k%2]) for k in range(4)]	
 			elif axis == 1:
-				axes = [plt.subplot(grid[:,0]), plt.subplot(grid[:,1])] # tall in half
+				w1,w2 = shapes[0][1],shapes[1][1]
+				grid = gridspec.GridSpec(2,4,width_ratios=[w1,w2,w1,w2])
+				axes = [plt.subplot(grid[:,0]), plt.subplot(grid[:,1])] # vertical in half
 			else:
-				axes = [plt.subplot(grid[0,:2]), plt.subplot(grid[1,:2])]
+				h1,h2 = shapes[0][0],shapes[1][0]
+				grid = gridspec.GridSpec(2, 4, height_ratios=[h1,h2])
+				axes = [plt.subplot(grid[0,:2]), plt.subplot(grid[1,:2])] # horizontal in half
 
 		else:
 			raise ValueError('Unexpected nmice in ImageEditor.animate_cuts: {}'.format(self.nmice))
 
-		pairs = [[axes[j],cut_list[j]] for j in range(len(axes))]
+		full_ax = plt.subplot(grid[:,2:])
+		pairs = [[axes[j],cuts[j]] for j in range(len(axes))]
 		for p in pairs:
 			ax,cl = p
 			by,bx = cl[0].shape

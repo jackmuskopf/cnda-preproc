@@ -21,8 +21,8 @@ im3 = ImageEditor(PETImage(f3,fpath),nmice=4,escale=24.0)
 
 im3.image.load_image()
 
-im3.animated_cutter()
+im3.animated_cutter('x')
 
 im3.cut_image()
 
-im3.animate_cuts()
+im3.animate_cuts('x')
