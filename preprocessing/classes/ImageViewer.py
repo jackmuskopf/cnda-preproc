@@ -14,8 +14,7 @@ class ImageViewer:
 		self.pause = False
 
 		# cut coords (only used in ImageEditor)
-		self.cx = 64
-		self.cy = 64
+		self.cx,self.cy = int(round(self.image.xdim/2)),int(round(self.image.ydim/2))
 
 		# scaling to use when displaying images
 		self.escale = escale
@@ -35,6 +34,9 @@ class ImageViewer:
 	def swap_x(self,frames):	
 		return [f.swapaxes(0,1) for f in frames]
 
+	def stop_animation(self):
+		plt.close()
+
 
 	def connect_controls(self,fig):
 		
@@ -43,7 +45,7 @@ class ImageViewer:
 		    if event.key == ' ':
 		    	self.pause ^= True
 		    elif event.key == 'c':
-		    	plt.close()
+		    	self.stop_animation()
 
 		def onClick(event):
 			if event.xdata is not None and event.ydata is not None:
@@ -191,7 +193,7 @@ class ImageViewer:
 			zmats = zmats+zmats
 			nframes = 2
 
-		self.cx,self.cy = (64,64)
+		self.cx,self.cy = int(round(self.image.xdim/2)),int(round(self.image.ydim/2))
 		self.pause = False
 
 		xbx,xby = self.image.bounds[self.image.get_axis('x')]
@@ -225,15 +227,16 @@ class ImageViewer:
 
 class ImageEditor(ImageViewer):
 
-	def __init__(self, image, nmice, collapse='max', escale=1.0):
+	def __init__(self, image, nmice=None, collapse='max', escale=1.0):
 		ImageViewer.__init__(self, image, collapse=collapse, escale=escale)
 
 		# for displaying cut
 		self.line_map = {4:2, 2:1, 1:0}
-		if nmice not in [1,2,4]:
-			raise ValueError('Unexpected nmice: {}'.format(nmice))
 		self.nmice = nmice
 
+	def check_nmice(self):
+		if self.nmice not in range(1,5):
+			raise ValueError('ImageEditor.nmice not properly initialized.')
 
 
 
@@ -263,6 +266,7 @@ class ImageEditor(ImageViewer):
 			img.set_array(mats[k])
 			return patches
 
+		self.check_nmice()
 
 		# method routine
 		if method not in ['collapse','slice','each_slice']:
@@ -288,7 +292,8 @@ class ImageEditor(ImageViewer):
 		if len(mats) == 1:
 			mats =  mats + mats
 
-		self.cx,self.cy = (64,64)
+		self.cx,self.cy = int(round(self.image.xdim/2)),int(round(self.image.ydim/2))
+		print(self.cx,self.cy)
 		self.pause = False
 		nlines = self.line_map[self.nmice]
 		view_ax = self.image.get_axis(view_ax)
@@ -316,6 +321,8 @@ class ImageEditor(ImageViewer):
 
 		cx,cy = self.cx,self.cy
 
+		self.check_nmice()
+
 		# cut in half in y,z plane
 		if self.nmice == 2:
 			img_data = self.image.img_data
@@ -330,7 +337,7 @@ class ImageEditor(ImageViewer):
 			return self.image.cuts
 
 		# cut in quadrants in y,z and x,z planes
-		elif self.nmice == 4:
+		elif self.nmice in [3,4]:
 			img_data = self.image.img_data
 			
 			# cut in half in y,z
@@ -380,6 +387,8 @@ class ImageEditor(ImageViewer):
 			for j,im in enumerate(imgs):
 				im.set_array(cuts[j][k])
 			return all_imgs
+
+		self.check_nmice()
 
 		if self.image.cuts is None:
 			raise ValueError('Image has not been cut in ImageEditor.animate_cuts.')

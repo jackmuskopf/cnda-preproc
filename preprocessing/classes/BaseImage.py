@@ -85,6 +85,7 @@ class SubPET(BaseImage):
     def __init__(self, fileprefix, parent_image, img_data):
 
         BaseImage.__init__(self, fileprefix, img_data)
+        self.type = 'pet'
         self.parent_image = parent_image
         self.frame_range = parent_image.frame_range
         self.plane_range = parent_image.plane_range
@@ -105,12 +106,12 @@ class PETImage(BaseImage):
         Needs header file and data file in same directory
         '''
         BaseImage.__init__(self, fileprefix, img_data)
-
+        self.type = 'pet'
         self.params = None
 
         self.filepath = filepath
-        self.header_file = os.path.join(filepath,fileprefix+'.img.hdr')
-        self.data_file = os.path.join(filepath,fileprefix+'.img')
+        self.header_file = os.path.join(filepath,fileprefix+'.pet.img.hdr')
+        self.data_file = os.path.join(filepath,fileprefix+'.pet.img')
         self.load_header()  # initialize params
         self.xdim = self.params.x_dimension
         self.ydim = self.params.y_dimension
