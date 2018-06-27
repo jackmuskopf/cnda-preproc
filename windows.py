@@ -6,6 +6,12 @@ from preprocessing.classes.baseimage import *
 from preprocessing.classes.imageviewer import *
 from preprocessing.settings import *
 
+def is_pet(fname):
+    if 'pet' in fname and '.ct' not in fname and fname.endswith('.img'):
+        return True
+    else:
+        return False
+
 class ImageGUI(tk.Tk):
 
     def __init__(self, folder='data'):
@@ -25,10 +31,8 @@ class ImageGUI(tk.Tk):
         # and where it is placed
         self.geometry('%dx%d+%d+%d' % (w, h, x, y))
 
-        self.geometry("500x500")
-
         self.img_type = None
-        self.fileprefix = None
+        self.filepath = None
         self.image_editor = None
         self.nmice = None
         self.folder = folder.strip('/').strip('\\').strip()
@@ -36,6 +40,7 @@ class ImageGUI(tk.Tk):
         # self.ct_path = os.path.join(folder,'ct')
         self.escale = 14.0
         self.view_ax = 'z'
+        self.iicoords = (20,140)
 
         self.title_font = tkfont.Font(family='Helvetica', size=18, weight="bold", slant="italic")
 
@@ -63,7 +68,7 @@ class ImageGUI(tk.Tk):
 
     def list_files(self):
         fnames = [os.path.join(dp, f) for dp, dn, filenames in os.walk(self.folder) for f in filenames]
-        pet_files =  [f for f in fnames if f.endswith('.pet.img')]
+        pet_files =  [f for f in fnames if is_pet(f)]
         ct_files = [f for f in fnames if f.endswith('.ct.img')]
         return pet_files,ct_files
         
@@ -81,6 +86,7 @@ class ImageGUI(tk.Tk):
 
     def start_pet(self,filepath):
         self.img_type = 'pet'
+        self.filepath = filepath
         self.image_editor = ImageEditor(PETImage(filepath),escale=self.escale)
         self.image_editor.image.load_image()
         self.show_frame("ImageRotator")
@@ -97,6 +103,23 @@ class ImageGUI(tk.Tk):
             self.image_editor.escale = float(escale)
         self.escale = float(escale)
 
+    def get_img_info(self,frame):
+        fname = ntpath.basename(self.filepath)
+        nframes = self.image_editor.image.nframes
+        nmice = self.nmice if self.nmice is not None else '?'
+        text = '\n'.join(['File : {}',
+                        'Number of frames : {}',
+                        'Number of mice : {}'
+            ]).format(fname,nframes,nmice)
+        label = tk.Label(frame,text=text,font=tkfont.Font(family='Helvetica', size=9),justify=tk.LEFT)
+        return label
+
+    def init_img_info(self,frame):
+        if frame.img_info is not None:
+            frame.img_info.destroy()
+        frame.img_info = self.get_img_info(frame)
+        coords = self.iicoords
+        frame.img_info.place(x=coords[0],y=coords[1])
 
 class ImageSelector(tk.Frame):
 
@@ -123,6 +146,7 @@ class ImageRotator(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.controller = controller
+        self.img_info = None
         
         label = tk.Label(self, text="Image Rotator", font=controller.title_font)
         label.pack(side="top", fill="x", pady=10)
@@ -138,9 +162,9 @@ class ImageRotator(tk.Frame):
                 'Notes on rotation:',
                 'x-axis: belly should be up, head to right',
                 'y-axis: head should be up, heart on right']), 
-            font=tkfont.Font(family='Helvetica', size=12),
+            font=tkfont.Font(family='Helvetica', size=9),
             justify=tk.LEFT
-            ).place(x=20,y=140)
+            ).place(x=20,y=320)
 
         nbbx,nbby = 135,400
         tk.Button(self, text="Back",command=self.back).place(x=nbbx,y=nbby)
@@ -165,6 +189,7 @@ class ImageRotator(tk.Frame):
         
 
     def re_init(self):
+        self.controller.init_img_info(self)
         self.init_escaler()
         self.init_ani()
 
@@ -203,8 +228,10 @@ class ImageRotator(tk.Frame):
             print('Specify number of mice before continuing.')
 
     def set_nmice(self):
-        self.controller.image_editor.nmice = self.tknmice.get()
-        self.controller.nmice = self.tknmice.get()
+        nmice = self.tknmice.get()
+        if nmice is not None:
+            self.controller.image_editor.nmice = self.tknmice.get()
+            self.controller.nmice = self.tknmice.get()
 
 
 class ImageCutter(tk.Frame):
@@ -212,6 +239,8 @@ class ImageCutter(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.controller = controller
+        self.img_info = None
+
         label = tk.Label(self, text="Image Cutter", font=controller.title_font)
         label.pack(side="top", fill="x", pady=10)
 
@@ -236,6 +265,7 @@ class ImageCutter(tk.Frame):
 
 
     def re_init(self):
+        self.controller.init_img_info(self)
         self.controller.view_ax = 'z'
         self.init_escaler()
         self.init_ani()
@@ -275,9 +305,11 @@ class CutViewer(tk.Frame):
         tk.Frame.__init__(self, parent)
         self.controller = controller
         self.view_ax = 'z'
+
+        self.img_info = None
         
 
-        label = tk.Label(self, text="Review Cut", font=controller.title_font)
+        label = tk.Label(self, text="Review", font=controller.title_font)
         label.pack(side="top", fill="x", pady=10)
 
         # back button
@@ -296,6 +328,7 @@ class CutViewer(tk.Frame):
         
 
     def re_init(self):
+        self.controller.init_img_info(self)
         self.init_escaler()
         self.init_ani()
 
@@ -330,6 +363,6 @@ class CutViewer(tk.Frame):
         self.animate_cuts()
 
 if __name__ == "__main__":
-    data_folder = os.path.join('data','Pre-Clinical_Data_Samples')
+    data_folder = os.path.join('data','pcds')
     app = ImageGUI(folder=data_folder)
     app.mainloop()

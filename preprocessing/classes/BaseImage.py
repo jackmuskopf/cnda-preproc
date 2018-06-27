@@ -109,7 +109,6 @@ class PETImage(BaseImage):
         self.type = 'pet'
         self.params = None
 
-        self.filepath = filepath
         self.header_file = filepath+'.hdr'
         self.load_header()  # initialize params
         self.xdim = self.params.x_dimension
