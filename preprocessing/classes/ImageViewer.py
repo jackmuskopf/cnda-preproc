@@ -14,7 +14,8 @@ class ImageViewer:
 		self.pause = False
 
 		# cut coords (only used in ImageEditor)
-		self.cx,self.cy = int(round(self.image.xdim/2)),int(round(self.image.ydim/2))
+		self.cx_def,self.cy_def = int(round(self.image.xdim/2)),int(round(self.image.ydim/2))
+		self.cx,self.cy = self.cx_def,self.cy_def
 
 		# scaling to use when displaying images
 		self.escale = escale
@@ -38,7 +39,7 @@ class ImageViewer:
 		plt.close()
 
 
-	def connect_controls(self,fig):
+	def connect_controls(self,fig,cutter=False):
 		
 		def onKey(event):
 		    global pause
@@ -50,10 +51,15 @@ class ImageViewer:
 		def onClick(event):
 			if event.xdata is not None and event.ydata is not None:
 				self.cx,self.cy = (int(round(event.xdata)),int(round(event.ydata)))
-				print(self.cx,self.cy)
+				if self.nmice > 2:
+					message = 'Cutter coords: (x={0},y={1})'.format(self.cx,self.cy)
+				else:
+					message = 'Cutter coords: (x={})'.format(self.cx)
+				print(message)
 
 		fig.canvas.mpl_connect('key_press_event', onKey)
-		fig.canvas.mpl_connect('button_press_event', onClick)
+		if cutter:
+			fig.canvas.mpl_connect('button_press_event', onClick)
 
 	def view_each_axis(self, frame_range=None):
 		if frame_range is None:
@@ -193,7 +199,6 @@ class ImageViewer:
 			zmats = zmats+zmats
 			nframes = 2
 
-		self.cx,self.cy = int(round(self.image.xdim/2)),int(round(self.image.ydim/2))
 		self.pause = False
 
 		xbx,xby = self.image.bounds[self.image.get_axis('x')]
@@ -292,8 +297,6 @@ class ImageEditor(ImageViewer):
 		if len(mats) == 1:
 			mats =  mats + mats
 
-		self.cx,self.cy = int(round(self.image.xdim/2)),int(round(self.image.ydim/2))
-		print(self.cx,self.cy)
 		self.pause = False
 		nlines = self.line_map[self.nmice]
 		view_ax = self.image.get_axis(view_ax)
@@ -311,7 +314,7 @@ class ImageEditor(ImageViewer):
 		ax.set_xlim(0, bx)
 		ax.set_ylim(0, by)
 
-		self.connect_controls(fig)
+		self.connect_controls(fig,cutter=True)
 		ani = animation.FuncAnimation(fig, genAni, genIx, blit=True, interval=interval,
 		    repeat=True)
 		plt.show()
