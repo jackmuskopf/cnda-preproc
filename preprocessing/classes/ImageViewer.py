@@ -3,11 +3,11 @@ import matplotlib.animation as animation
 import matplotlib.gridspec as gridspec
 import numpy as np
 import warnings
-from .BaseImage import PETImage, SubPET
+from .baseimage import PETImage, SubPET
 
 class ImageViewer:
 
-	def __init__(self, image=None, collapse='max', escale=1.0):
+	def __init__(self, image=None, collapse='max', escale=1.0, interval=100):
 		self.image = image    # data_handler.MyImage superclass
 
 		# toggle for animation
@@ -22,6 +22,8 @@ class ImageViewer:
 
 		# method of collapsing axes for 2d viewing of 3d data
 		self.collapse = collapse
+
+		self.interval = interval
 
 	def is_x(self,ax):
 		return [k for k,v in self.image.ax_map.items() if v==ax][0]=='x'
@@ -92,7 +94,7 @@ class ImageViewer:
 		plt.show()
 
 
-	def animate_slice(self,view_ax,slice_ix):
+	def animate_slice(self,view_ax,slice_ix, get_mats=False):
 		self.check_frames()
 		view_ax = self.image.get_axis(view_ax)
 		frames = np.take(self.image.img_data, slice_ix, view_ax)
@@ -100,9 +102,13 @@ class ImageViewer:
 		frames = self.image.split_on_axis(frames,2)
 		if self.is_x(view_ax):
 			frames = self.swap_x(frames)
-		return frames
+		
+		if get_mats:
+			return frames	
+		else:
+			self.do_animation(frames)
 
-	def animate_collapse(self,view_ax):
+	def animate_collapse(self,view_ax, get_mats=False):
 		self.check_frames()
 		view_ax = self.image.get_axis(view_ax)
 		f1,f2 = self.image.frame_range
@@ -111,19 +117,27 @@ class ImageViewer:
 		mats = [m*scale for m in mats]
 		if self.is_x(view_ax):
 			mats = self.swap_x(mats)
-		return mats
+		
+		if get_mats:
+			return mats
+		else:
+			self.do_animation(mats)
 
-	def animate_along_axis(self,axis,frame=None):
+	def animate_along_axis(self,axis,frame=None, get_mats=False):
 		if frame is None:
 			frame = self.image.frame_range[0]
 		frame_mat = self.image.get_frame(frame)
 		scale = self.escale/frame_mat.max()
 		frame_mat = frame_mat*scale
 		mats = self.image.split_on_axis(frame_mat, axis)
-		return mats
+		
+		if get_mats:
+			return mats
+		else:
+			self.do_animation(mats)
 
 
-	def do_animation(self,frames,interval=50):
+	def do_animation(self,frames):
 		
 		def genIx():
 			dt = 1
@@ -153,12 +167,12 @@ class ImageViewer:
 		ax.set_ylim(0, by)
 
 		self.connect_controls(fig)
-		ani = animation.FuncAnimation(fig, genAni, genIx, blit=True, interval=interval,
+		ani = animation.FuncAnimation(fig, genAni, genIx, blit=True, interval=self.interval,
 		    repeat=True)
 		plt.show()
 
 		
-	def animate_axes(self, interval=100):
+	def animate_axes(self):
 		def genIx():
 			dt = 1
 			t = 0
@@ -223,7 +237,7 @@ class ImageViewer:
 			ax.set_title(ax_title[j])
 
 		self.connect_controls(fig)
-		ani = animation.FuncAnimation(fig, genAni, genIx, blit=True, interval=interval,
+		ani = animation.FuncAnimation(fig, genAni, genIx, blit=True, interval=self.interval,
 		    repeat=True)
 		plt.show()
 
@@ -245,7 +259,7 @@ class ImageEditor(ImageViewer):
 
 
 
-	def animated_cutter(self, view_ax='z', method='collapse', frame_range=None, slice_ix=None, interval=100):
+	def animated_cutter(self, view_ax='z', method='collapse', frame_range=None, slice_ix=None):
 
 		def genIx():
 			dt = 1
@@ -281,16 +295,15 @@ class ImageEditor(ImageViewer):
 			frame_range = self.image.frame_range
 
 		if method == 'collapse':	# add frame_range info
-			mats = self.animate_collapse(view_ax=view_ax)
+			mats = self.animate_collapse(view_ax=view_ax, get_mats=True)
 		elif method == 'slice':		# add frame_range info
 			if slice_ix is None:
 				print('No slice index indicated. Using 0.')
 				slice_ix = 0
-			mats = self.animate_slice(view_ax=view_ax,
-								slice_ix=slice_ix)
+			mats = self.animate_slice(view_ax=view_ax, slice_ix=slice_ix, get_mats=True)
 		else:
 			frames = range(frame_range[0],frame_range[1]+1)
-			mat_groups = [self.animate_along_axis(view_ax,frame=f) for f in frames]
+			mat_groups = [self.animate_along_axis(view_ax, frame=f, get_mats=True) for f in frames]
 			mats = [mat for group in mat_groups for mat in group]
 
 		# prevents error in matplotlib.animation if only one image
@@ -304,6 +317,8 @@ class ImageEditor(ImageViewer):
 
 		if self.nmice > 2 and view_ax !=0:
 			raise ValueError('Must cut images with {} mice via z-axis view.'.format(self.nmice))
+		if view_ax == 2:
+			raise ValueError('Cannot cut images in x-axis view.')
 
 		fig = plt.figure()
 
@@ -314,8 +329,9 @@ class ImageEditor(ImageViewer):
 		ax.set_xlim(0, bx)
 		ax.set_ylim(0, by)
 
+
 		self.connect_controls(fig,cutter=True)
-		ani = animation.FuncAnimation(fig, genAni, genIx, blit=True, interval=interval,
+		ani = animation.FuncAnimation(fig, genAni, genIx, blit=True, interval=self.interval,
 		    repeat=True)
 		plt.show()
 
@@ -331,10 +347,8 @@ class ImageEditor(ImageViewer):
 			img_data = self.image.img_data
 			left_half = img_data[:,:,:cx,:]
 			right_half = img_data[:,:,cx:,:]
-			lh_name = 'half1_'+self.image.fileprefix
-			rh_name = 'half2_'+self.image.fileprefix
-			left_im = SubPET(fileprefix=lh_name, parent_image=self.image, img_data=left_half)
-			right_im = SubPET(fileprefix=rh_name, parent_image=self.image, img_data=right_half)
+			left_im = SubPET(parent_image=self.image, img_data=left_half)
+			right_im = SubPET(parent_image=self.image, img_data=right_half)
 			
 			self.image.cuts = (left_im, right_im)
 			return self.image.cuts
@@ -354,15 +368,11 @@ class ImageEditor(ImageViewer):
 			bottom_right = right_half[:,:cy,:,:]
 			top_right = right_half[:,cy:,:,:]
 
-			tlname = 'topleft_'+self.image.fileprefix
-			trname = 'topright_'+self.image.fileprefix
-			blname = 'bottomleft_'+self.image.fileprefix
-			brname = 'bottomright_'+self.image.fileprefix
 
-			tl = SubPET(fileprefix=tlname, parent_image=self.image, img_data=top_left)
-			tr = SubPET(fileprefix=trname, parent_image=self.image, img_data=top_right)
-			bl = SubPET(fileprefix=blname, parent_image=self.image, img_data=bottom_left)
-			br = SubPET(fileprefix=brname, parent_image=self.image, img_data=bottom_right)
+			tl = SubPET(parent_image=self.image, img_data=top_left)
+			tr = SubPET(parent_image=self.image, img_data=top_right)
+			bl = SubPET(parent_image=self.image, img_data=bottom_left)
+			br = SubPET(parent_image=self.image, img_data=bottom_right)
 
 			self.image.cuts = (tl,tr,bl,br)
 
@@ -375,7 +385,7 @@ class ImageEditor(ImageViewer):
 			raise ValueError('ImageEditor with nmice = {} calling self.cut_image()')
 
 
-	def animate_cuts(self, view_ax='z', interval=100):
+	def animate_cuts(self, view_ax='z'):
 		
 		def genIx():
 			dt = 1
@@ -410,14 +420,14 @@ class ImageEditor(ImageViewer):
 		cuts = self.image.cuts
 		cuts = [cut.img_data for cut in cuts]
 		
-		# join data if necessary
-		if self.nmice == 4 and axis in [1,2]:
-			if axis == 1:
-				# join on y axis
-				cuts = [np.concatenate([cuts[0],cuts[2]],axis=1),np.concatenate([cuts[1],cuts[3]],axis=1)]
-			else:
-				# join on x axis
-				cuts = [np.concatenate([cuts[0],cuts[1]],axis=2),np.concatenate([cuts[2],cuts[3]],axis=2)]	
+		# # join data if necessary
+		# if self.nmice == 4 and axis in [1,2]:
+		# 	if axis == 1:
+		# 		# join on y axis
+		# 		cuts = [np.concatenate([cuts[0],cuts[2]],axis=1),np.concatenate([cuts[1],cuts[3]],axis=1)]
+		# 	else:
+		# 		# join on x axis
+		# 		cuts = [np.concatenate([cuts[0],cuts[1]],axis=2),np.concatenate([cuts[2],cuts[3]],axis=2)]	
 
 
 		cuts = [getattr(img_data,self.collapse)(axis=axis)*scale for img_data in cuts]
@@ -438,9 +448,10 @@ class ImageEditor(ImageViewer):
 		if self.nmice == 2:
 			w1,w2 = shapes[0][1],shapes[1][1]
 			grid = gridspec.GridSpec(2,4,width_ratios=[w1,w2,w1,w2])
-			if axis not in [0,1]:
-				raise ValueError('Invalid view axis for nmice = 2 in animate_cuts: {}'.format(view_ax))
-			axes = [plt.subplot(grid[:,0]), plt.subplot(grid[:,1])]	# tall in half
+			if axis in [0,1]: # z or y
+				axes = [plt.subplot(grid[:,0]), plt.subplot(grid[:,1])]	# tall in half
+			else: # x
+				axes = [plt.subplot(grid[0,:2]),plt.subplot(grid[1,:2])]
 
 		# todo: animation
 		elif self.nmice == 4:
@@ -449,20 +460,22 @@ class ImageEditor(ImageViewer):
 				w3 = (w1+w2)/2
 				h1,h2 = shapes[0][0],shapes[2][0]			
 				grid = gridspec.GridSpec(2, 4, height_ratios=[h1,h2], width_ratios=[w1,w2,w3,w3])				
-				axes = [plt.subplot(grid[k//2,k%2]) for k in range(4)]	
+				
 			elif axis == 1:
 				w1,w2 = shapes[0][1],shapes[1][1]
 				grid = gridspec.GridSpec(2,4,width_ratios=[w1,w2,w1,w2])
-				axes = [plt.subplot(grid[:,0]), plt.subplot(grid[:,1])] # vertical in half
+
 			else:
 				h1,h2 = shapes[0][0],shapes[1][0]
 				grid = gridspec.GridSpec(2, 4, height_ratios=[h1,h2])
-				axes = [plt.subplot(grid[0,:2]), plt.subplot(grid[1,:2])] # horizontal in half
+			axes = [plt.subplot(grid[k//2,k%2]) for k in range(4)]	
 
 		else:
 			raise ValueError('Unexpected nmice in ImageEditor.animate_cuts: {}'.format(self.nmice))
 
 		full_ax = plt.subplot(grid[:,2:])
+		if len(axes) != len(cuts):
+			raise ValueError('Uneven axes and cuts.')
 		pairs = [[axes[j],cuts[j]] for j in range(len(axes))]
 		for p in pairs:
 			ax,cl = p
@@ -475,7 +488,7 @@ class ImageEditor(ImageViewer):
 		all_imgs = f_img + imgs
 		
 		self.connect_controls(fig)
-		ani = animation.FuncAnimation(fig, genAni, genIx, blit=True, interval=interval,
+		ani = animation.FuncAnimation(fig, genAni, genIx, blit=True, interval=self.interval,
 		    repeat=True)
 		plt.tight_layout()
 		plt.show()

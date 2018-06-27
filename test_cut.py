@@ -24,4 +24,4 @@ im3.animated_cutter()
 
 im3.cut_image()
 
-im3.animate_cuts()
+im3.animate_cuts('x')

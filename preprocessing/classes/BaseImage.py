@@ -10,8 +10,8 @@ import warnings
 
 class BaseImage:
 
-    def __init__(self, fileprefix, img_data=None, frame_range=None):
-        self.fileprefix = fileprefix
+    def __init__(self, filepath=None, img_data=None, frame_range=None):
+        self.filepath = filepath
         self.img_data = img_data
         self.ax_map = {'z':0,'y':1,'x':2}
         self.frame_range = frame_range
@@ -82,9 +82,9 @@ class BaseImage:
 
 class SubPET(BaseImage):
 
-    def __init__(self, fileprefix, parent_image, img_data):
+    def __init__(self, parent_image, img_data, filepath=None):
 
-        BaseImage.__init__(self, fileprefix, img_data)
+        BaseImage.__init__(self, filepath=filepath, img_data=img_data)
         self.type = 'pet'
         self.parent_image = parent_image
         self.frame_range = parent_image.frame_range
@@ -101,17 +101,16 @@ class SubPET(BaseImage):
 # make so can initialize with np matrix
 class PETImage(BaseImage):
 
-    def __init__(self, fileprefix, filepath='', img_data=None):
+    def __init__(self, filepath, img_data=None):
         '''
         Needs header file and data file in same directory
         '''
-        BaseImage.__init__(self, fileprefix, img_data)
+        BaseImage.__init__(self, filepath, img_data)
         self.type = 'pet'
         self.params = None
 
         self.filepath = filepath
-        self.header_file = os.path.join(filepath,fileprefix+'.pet.img.hdr')
-        self.data_file = os.path.join(filepath,fileprefix+'.pet.img')
+        self.header_file = filepath+'.hdr'
         self.load_header()  # initialize params
         self.xdim = self.params.x_dimension
         self.ydim = self.params.y_dimension
@@ -305,7 +304,7 @@ class PETImage(BaseImage):
 
         # read data from file
         print('Reading image data...')
-        img_file = open(self.data_file,'rb')
+        img_file = open(self.filepath,'rb')
         matsize = ps.x_dimension*ps.y_dimension*nplanes
         pl_offset = pl[0]*(ps.x_dimension*ps.y_dimension)
         imgmat = []

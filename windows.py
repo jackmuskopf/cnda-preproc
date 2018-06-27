@@ -1,9 +1,9 @@
-
 import os
+import ntpath
 import tkinter as tk                
 from tkinter import font  as tkfont 
-from preprocessing.classes.BaseImage import *
-from preprocessing.classes.ImageViewer import *
+from preprocessing.classes.baseimage import *
+from preprocessing.classes.imageviewer import *
 from preprocessing.settings import *
 
 class ImageGUI(tk.Tk):
@@ -31,9 +31,9 @@ class ImageGUI(tk.Tk):
         self.fileprefix = None
         self.image_editor = None
         self.nmice = None
-        self.folder = folder
-        self.pet_path =  os.path.join(folder,'pet')
-        self.ct_path = os.path.join(folder,'ct')
+        self.folder = folder.strip('/').strip('\\').strip()
+        # self.pet_path =  os.path.join(folder,'pet')
+        # self.ct_path = os.path.join(folder,'ct')
         self.escale = 14.0
         self.view_ax = 'z'
 
@@ -61,10 +61,10 @@ class ImageGUI(tk.Tk):
         self.show_frame("ImageSelector")
 
 
-    def list_files(self, folder='data'):
-        folder = folder.strip('/').strip()
-        pet_files = [f for f in os.listdir(self.pet_path) if not f.endswith('.hdr')]
-        ct_files = [f for f in os.listdir(self.ct_path) if not f.endswith('.hdr')]
+    def list_files(self):
+        fnames = [os.path.join(dp, f) for dp, dn, filenames in os.walk(self.folder) for f in filenames]
+        pet_files =  [f for f in fnames if f.endswith('.pet.img')]
+        ct_files = [f for f in fnames if f.endswith('.ct.img')]
         return pet_files,ct_files
         
 
@@ -77,12 +77,11 @@ class ImageGUI(tk.Tk):
         try:
             frame.re_init()
         except Exception as e:
-            pass
+            print(e)
 
-    def start_pet(self,fileprefix):
+    def start_pet(self,filepath):
         self.img_type = 'pet'
-        self.fileprefix = fileprefix.split('.')[0]
-        self.image_editor = ImageEditor(PETImage(self.fileprefix,self.pet_path),escale=self.escale)
+        self.image_editor = ImageEditor(PETImage(filepath),escale=self.escale)
         self.image_editor.image.load_image()
         self.show_frame("ImageRotator")
 
@@ -111,7 +110,7 @@ class ImageSelector(tk.Frame):
 
         self.pet_buttons = []
         for pet in self.pet_files:
-            self.pet_buttons.append(tk.Button(self,text=pet, command=lambda pet=pet: controller.start_pet(pet)))
+            self.pet_buttons.append(tk.Button(self, text=ntpath.basename(pet), command=lambda pet=pet: controller.start_pet(pet)))
             self.pet_buttons[-1].pack()
 
         self.close_button = tk.Button(self, text="Close", command=controller.quit)
@@ -195,7 +194,11 @@ class ImageRotator(tk.Frame):
     def next_page(self):
         if self.controller.image_editor.nmice is not None:
             self.controller.image_editor.stop_animation()
-            self.controller.show_frame('ImageCutter')
+            if self.controller.image_editor.nmice == 1:
+                self.controller.view_ax = 'x'
+                self.controller.show_frame('CutViewer')
+            else:
+                self.controller.show_frame('ImageCutter')
         else:
             print('Specify number of mice before continuing.')
 
@@ -224,9 +227,8 @@ class ImageCutter(tk.Frame):
         tk.Button(self,text="Cut Image",command=self.do_cut).place(x=nbbx+180,y=nbby)
 
         vbx, vby = 200,220
-        viewx = tk.Button(self,text="View collapsed x-axis",command=lambda:self.change_ax('x')).place(x=vbx,y=vby)
-        viewy = tk.Button(self,text="View collapsed y-axis",command=lambda:self.change_ax('y')).place(x=vbx,y=vby+30)
-        viewz = tk.Button(self,text="View collapsed z-axis",command=lambda:self.change_ax('z')).place(x=vbx,y=vby+60)
+        viewy = tk.Button(self,text="View collapsed y-axis",command=lambda:self.change_ax('y')).place(x=vbx,y=vby)
+        viewz = tk.Button(self,text="View collapsed z-axis",command=lambda:self.change_ax('z')).place(x=vbx,y=vby+30)
         
     def recenter(self):
         self.controller.image_editor.cx, self.controller.image_editor.cy = self.controller.image_editor.cx_def, self.controller.image_editor.cy_def
@@ -234,8 +236,7 @@ class ImageCutter(tk.Frame):
 
 
     def re_init(self):
-        if self.controller.nmice == 4:
-            self.controller.view_ax = 'z'
+        self.controller.view_ax = 'z'
         self.init_escaler()
         self.init_ani()
 
@@ -312,16 +313,23 @@ class CutViewer(tk.Frame):
 
     def back(self):
         self.controller.image_editor.stop_animation()
-        self.controller.show_frame('ImageCutter')
+        if self.controller.image_editor.nmice == 1:
+            self.controller.show_frame('ImageRotator')
+        else:
+            self.controller.show_frame('ImageCutter')
 
     def animate_cuts(self):
         self.controller.image_editor.stop_animation()
-        self.controller.image_editor.animate_cuts(self.controller.view_ax)
+        if self.controller.image_editor.nmice == 1:
+            self.controller.image_editor.animate_collapse(self.controller.view_ax)
+        else:
+            self.controller.image_editor.animate_cuts(self.controller.view_ax)
 
     def change_ax(self,ax):
         self.controller.view_ax = ax
         self.animate_cuts()
 
 if __name__ == "__main__":
-    app = ImageGUI()
+    data_folder = os.path.join('data','Pre-Clinical_Data_Samples')
+    app = ImageGUI(folder=data_folder)
     app.mainloop()
