@@ -3,7 +3,8 @@ if sys.platform == 'darwin':
     import matplotlib
     matplotlib.use('TkAgg')
 import ntpath
-import tkinter as tk                
+import tkinter as tk
+from collections import defaultdict                
 from tkinter import font  as tkfont 
 from preprocessing.classes.baseimage import *
 from preprocessing.classes.imageviewer import *
@@ -12,18 +13,44 @@ from preprocessing.settings import *
 
 
 
-def is_pet(fname):
-    if 'pet' in fname and '.ct' not in fname and fname.endswith('.img'):
-        return True
-    else:
-        return False
+
+
+
+class LoadScreen(tk.Toplevel):
+    def __init__(self, parent):
+        tk.Toplevel.__init__(self, parent)
+        w = 500 # width for the Tk root
+        h = 250 # height for the Tk root
+
+        # get screen width and height
+        ws = self.winfo_screenwidth() # width of the screen
+        hs = self.winfo_screenheight() # height of the screen
+
+        # calculate x and y coordinates for the Tk root window
+        x = (ws/2) - (w/2)
+        y = (hs/2) - (h/2)
+
+        # set the dimensions of the screen 
+        # and where it is placed
+        self.geometry('%dx%d+%d+%d' % (w, h, x, y))
+        self.title("Image Preprocessing")
+        label = tk.Label(self, text="Loading Image...", font=tkfont.Font(family='Helvetica', size=18, weight="bold", slant="italic"))
+        label.pack(side="top", fill="x", pady=10)
+
+        ## required to make window show before the program gets to the mainloop
+        self.update()
+
+
+
+
 
 class ImageGUI(tk.Tk):
 
     def __init__(self, folder='data'):
         tk.Tk.__init__(self)
+        self.title("Image Preprocessing")
         w = 500 # width for the Tk root
-        h = 500 # height for the Tk root
+        h = 550 # height for the Tk root
 
         # get screen width and height
         ws = self.winfo_screenwidth() # width of the screen
@@ -81,10 +108,23 @@ class ImageGUI(tk.Tk):
 
 
     def get_files(self):
+
+        def is_pet(fname):
+            if 'pet' in fname and '.ct' not in fname and fname.endswith('.img'):
+                return True
+            else:
+                return False
+        
         fnames = [os.path.join(dp, f) for dp, dn, filenames in os.walk(self.folder) for f in filenames]
         pet_files =  [PETImage(f) for f in fnames if is_pet(f)]
         ct_files = [CTImage(f) for f in fnames if f.endswith('.ct.img')]
-        return pet_files,ct_files
+        all_files = pet_files+ct_files
+        all_files.sort(key=lambda x: x.subject_id)
+        groups = defaultdict(list)
+        for img in all_files:
+            groups[img.subject_id].append(img)
+        img_pairs = groups.values()
+        return img_pairs
         
 
 
@@ -100,8 +140,12 @@ class ImageGUI(tk.Tk):
 
 
     def start_img(self,img):
+        self.withdraw()
+        splash = LoadScreen(self)        
         self.image_editor = ImageEditor(img,escale=self.escale)
         self.image_editor.image.load_image()
+        splash.destroy()
+        self.deiconify()
         self.show_frame("ImageRotator")
 
 
@@ -156,33 +200,58 @@ class ImageGUI(tk.Tk):
         coords = self.iicoords
         frame.img_info.place(x=coords[0],y=coords[1])
 
+
+
 class ImageSelector(tk.Frame):
 
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.controller = controller
         label = tk.Label(self, text="Select Image", font=controller.title_font)
-        label.grid(row=0,column=1,columnspan=3,padx=(30,0),pady=(0,20))
+        label.grid(row=0,column=1,columnspan=2,padx=(30,0),pady=(0,20))
+        
+        petcol = 1
+        ctcol = 2
 
-        self.pet_files,self.ct_files = self.controller.get_files()
+        # pad space
+        tk.Label(self,text=' '*25).grid(column=0)
 
-        self.pet_buttons = []
-        for i,pet in enumerate(self.pet_files):
-            self.pet_buttons.append(
-                tk.Button(self, 
-                text=pet.filename,
-                anchor='e',
-                command=lambda pet=pet: controller.start_img(pet)))
-            self.pet_buttons[-1].grid(row=i+1,column=1,padx=40)
-        self.ct_buttons = []
-        for i,ct in enumerate(self.ct_files):
-            self.ct_buttons.append(
-                tk.Button(self,
-                    text=ct.filename,
-                    anchor='w',
-                    command=lambda ct=ct: controller.start_img(ct)
-                    ))
-            self.ct_buttons[-1].grid(row=i+1,column=3)
+        col_title_font = tkfont.Font(family='Helvetica', size=14)
+        tk.Label(self, text="PET Images", font=col_title_font).grid(row=1,column=petcol)
+        tk.Label(self, text="CT Images", font=col_title_font).grid(row=1,column=ctcol)
+
+
+        img_pairs = self.controller.get_files()
+        for i,pair in enumerate(img_pairs):
+            try:
+                im1,im2 = pair
+            except:
+                im1,im2 = pair[0],None
+            for im in [im1,im2]:
+                if im is not None:
+                    column = petcol if im.type == 'pet' else ctcol
+                    tk.Button(self,
+                        text=im.filename,
+                        command = lambda im=im: controller.start_img(im)).grid(row=i+2,column=column)
+
+
+        # self.pet_buttons = []
+        # for i,pet in enumerate(self.pet_files):
+        #     self.pet_buttons.append(
+        #         tk.Button(self, 
+        #         text=pet.filename,
+        #         anchor='e',
+        #         command=lambda pet=pet: controller.start_img(pet)))
+        #     self.pet_buttons[-1].grid(row=i+1,column=1,padx=40)
+        # self.ct_buttons = []
+        # for i,ct in enumerate(self.ct_files):
+        #     self.ct_buttons.append(
+        #         tk.Button(self,
+        #             text=ct.filename,
+        #             anchor='w',
+        #             command=lambda ct=ct: controller.start_img(ct)
+        #             ))
+        #     self.ct_buttons[-1].grid(row=i+1,column=3)
 
 
     def re_init(self):

@@ -296,6 +296,7 @@ class ImageEditor(ImageViewer):
 
 		if method == 'collapse':	# add frame_range info
 			mats = self.animate_collapse(view_ax=view_ax, get_mats=True)
+			mats.reverse()
 		elif method == 'slice':		# add frame_range info
 			if slice_ix is None:
 				print('No slice index indicated. Using 0.')
