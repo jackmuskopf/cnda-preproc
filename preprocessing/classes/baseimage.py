@@ -17,7 +17,8 @@ class BaseImage:
         self.ax_map = {'z':0,'y':1,'x':2}
         self.frame_range = frame_range
         if filepath is not None:
-            self.subject_id = ntpath.basename(filepath).split('_')[0]
+            self.filename = ntpath.basename(filepath)
+            self.subject_id = self.filename.split('_')[0]
 
 
     def load_header(self):

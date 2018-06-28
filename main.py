@@ -48,7 +48,7 @@ class ImageGUI(tk.Tk):
         self.str_scale = tk.StringVar()
 
         # escaler coords
-        self.escaler_x,self.escaler_y = 380,245
+        self.escaler_x,self.escaler_y = 360,245
         
         # view axis
         self.view_ax = 'z'
@@ -80,10 +80,10 @@ class ImageGUI(tk.Tk):
         self.show_frame("ImageSelector")
 
 
-    def list_files(self):
+    def get_files(self):
         fnames = [os.path.join(dp, f) for dp, dn, filenames in os.walk(self.folder) for f in filenames]
-        pet_files =  [f for f in fnames if is_pet(f)]
-        ct_files = [f for f in fnames if f.endswith('.ct.img')]
+        pet_files =  [PETImage(f) for f in fnames if is_pet(f)]
+        ct_files = [CTImage(f) for f in fnames if f.endswith('.ct.img')]
         return pet_files,ct_files
         
 
@@ -98,17 +98,9 @@ class ImageGUI(tk.Tk):
         except Exception as e:
             print(e)
 
-    def start_pet(self,filepath):
-        self.img_type = 'pet'
-        self.filepath = filepath
-        self.image_editor = ImageEditor(PETImage(filepath),escale=self.escale)
-        self.image_editor.image.load_image()
-        self.show_frame("ImageRotator")
 
-    def start_ct(self,filepath):
-        self.img_type = 'ct'
-        self.filepath = filepath
-        self.image_editor = ImageEditor(CTImage(filepath),escale=self.escale)
+    def start_img(self,img):
+        self.image_editor = ImageEditor(img,escale=self.escale)
         self.image_editor.image.load_image()
         self.show_frame("ImageRotator")
 
@@ -147,7 +139,7 @@ class ImageGUI(tk.Tk):
 
 
     def get_img_info(self,frame):
-        fname = ntpath.basename(self.filepath)
+        fname = self.image_editor.image.filename
         nframes = self.image_editor.image.nframes
         nmice = self.nmice if self.nmice is not None else '?'
         text = '\n'.join(['File : {}',
@@ -172,23 +164,23 @@ class ImageSelector(tk.Frame):
         label = tk.Label(self, text="Select Image", font=controller.title_font)
         label.grid(row=0,column=1,columnspan=3,padx=(30,0),pady=(0,20))
 
-        self.pet_files,self.ct_files = self.controller.list_files()
+        self.pet_files,self.ct_files = self.controller.get_files()
 
         self.pet_buttons = []
         for i,pet in enumerate(self.pet_files):
             self.pet_buttons.append(
                 tk.Button(self, 
-                text=ntpath.basename(pet),
+                text=pet.filename,
                 anchor='e',
-                command=lambda pet=pet: controller.start_pet(pet)))
+                command=lambda pet=pet: controller.start_img(pet)))
             self.pet_buttons[-1].grid(row=i+1,column=1,padx=40)
         self.ct_buttons = []
         for i,ct in enumerate(self.ct_files):
             self.ct_buttons.append(
                 tk.Button(self,
-                    text=ntpath.basename(ct),
+                    text=ct.filename,
                     anchor='w',
-                    command=lambda ct=ct: controller.start_ct(ct)
+                    command=lambda ct=ct: controller.start_img(ct)
                     ))
             self.ct_buttons[-1].grid(row=i+1,column=3)
 
