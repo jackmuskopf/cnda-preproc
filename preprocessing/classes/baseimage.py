@@ -186,7 +186,7 @@ class PETImage(BaseImage):
                     2 : (self.zdim, self.ydim)}
         self.scaled = None
 
-        self.children = None
+        self.cuts = None
 
 
 

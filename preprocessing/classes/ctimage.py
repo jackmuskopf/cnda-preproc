@@ -34,7 +34,22 @@ class CTImage(BaseImage):
         self.integers = ['data_type','z_dimension','total_frames','x_dimension','y_dimension']
         self.per_frame = ['scale_factor','frame_duration'] 
         self.load_header()
+        self.xdim = self.params.x_dimension
+        self.ydim = self.params.y_dimension
+        self.zdim = self.params.z_dimension
 
+        self.frame_range = None
+        self.plane_range = None
+        self.nframes = None
+
+        self.bounds={0 : (self.ydim, self.xdim), 
+                    1 : (self.xdim, self.zdim),
+                    2 : (self.zdim, self.ydim)}
+        self.scaled = None
+
+        self.cuts = None
+
+        
     def load_image(self,plane_range=None,frame_range=None,unscaled=False):
         '''
         - loads specified frames into np.ndarray

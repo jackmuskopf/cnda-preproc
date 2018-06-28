@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import font  as tkfont 
 from preprocessing.classes.baseimage import *
 from preprocessing.classes.imageviewer import *
+from preprocessing.classes.ctimage import *
 from preprocessing.settings import *
 
 
@@ -104,6 +105,14 @@ class ImageGUI(tk.Tk):
         self.image_editor.image.load_image()
         self.show_frame("ImageRotator")
 
+    def start_ct(self,filepath):
+        self.img_type = 'ct'
+        self.filepath = filepath
+        self.image_editor = ImageEditor(CTImage(filepath),escale=self.escale)
+        self.image_editor.image.load_image()
+        self.show_frame("ImageRotator")
+
+
 
 
     def init_escaler(self, frame):
@@ -161,17 +170,27 @@ class ImageSelector(tk.Frame):
         tk.Frame.__init__(self, parent)
         self.controller = controller
         label = tk.Label(self, text="Select Image", font=controller.title_font)
-        label.pack(side="top", fill="x", pady=10)
+        label.grid(row=0,column=1,columnspan=3,padx=(30,0),pady=(0,20))
 
         self.pet_files,self.ct_files = self.controller.list_files()
 
         self.pet_buttons = []
-        for pet in self.pet_files:
+        for i,pet in enumerate(self.pet_files):
             self.pet_buttons.append(
                 tk.Button(self, 
-                text=ntpath.basename(pet), 
+                text=ntpath.basename(pet),
+                anchor='e',
                 command=lambda pet=pet: controller.start_pet(pet)))
-            self.pet_buttons[-1].pack()
+            self.pet_buttons[-1].grid(row=i+1,column=1,padx=40)
+        self.ct_buttons = []
+        for i,ct in enumerate(self.ct_files):
+            self.ct_buttons.append(
+                tk.Button(self,
+                    text=ntpath.basename(ct),
+                    anchor='w',
+                    command=lambda ct=ct: controller.start_ct(ct)
+                    ))
+            self.ct_buttons[-1].grid(row=i+1,column=3)
 
 
     def re_init(self):
