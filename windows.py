@@ -1,10 +1,15 @@
-import os
+import os, sys
+if sys.platform == 'darwin':
+    import matplotlib
+    matplotlib.use('TkAgg')
 import ntpath
 import tkinter as tk                
 from tkinter import font  as tkfont 
 from preprocessing.classes.baseimage import *
 from preprocessing.classes.imageviewer import *
 from preprocessing.settings import *
+
+
 
 def is_pet(fname):
     if 'pet' in fname and '.ct' not in fname and fname.endswith('.img'):
