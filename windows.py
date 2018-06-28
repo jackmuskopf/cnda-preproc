@@ -41,10 +41,18 @@ class ImageGUI(tk.Tk):
         self.image_editor = None
         self.nmice = None
         self.folder = folder.strip('/').strip('\\').strip()
-        # self.pet_path =  os.path.join(folder,'pet')
-        # self.ct_path = os.path.join(folder,'ct')
+
+        # default exposure scale
         self.escale = 14.0
+        self.str_scale = tk.StringVar()
+
+        # escaler coords
+        self.escaler_x,self.escaler_y = 380,245
+        
+        # view axis
         self.view_ax = 'z'
+        
+        # image info coords
         self.iicoords = (20,140)
 
         self.title_font = tkfont.Font(family='Helvetica', size=18, weight="bold", slant="italic")
@@ -97,22 +105,37 @@ class ImageGUI(tk.Tk):
         self.show_frame("ImageRotator")
 
 
-    # def make_escale(self, frame):
-    #     escaler = tk.Scale(frame, from_=1, to=100, resolution=.05, orient=tk.HORIZONTAL, label='Exposure', command=self.adjust_escale)
-    #     escaler.set(self.escale)
-    #     return escaler
+
+    def init_escaler(self, frame):
+        self.adjust_escale(frame)
+        try:
+            frame.escaler.destroy()
+        except:
+            pass
+        frame.escaler = self.make_escale(frame)
+        frame.escaler.place(x=self.escaler_x,y=self.escaler_y)
+
+        if frame.escale_label is None:
+            frame.escale_label = tk.Label(frame, text="Exposure Scale:",justify=tk.LEFT).place(x=self.escaler_x,y=self.escaler_y-30)
+        if frame.escale_apply is None:
+            frame.escale_apply = tk.Button(frame, text="Apply",command=frame.re_init).place(x=self.escaler_x+30,y=self.escaler_y+30)
 
     def make_escale(self, frame):
-        frame.str_scale = tk.StringVar()
-        frame.str_scale.set(str(self.escale))
-        escaler = tk.Entry(frame,textvariable=frame.str_scale)
+        self.str_scale.set(str(self.escale))
+        escaler = tk.Entry(frame,textvariable=self.str_scale)
         return escaler
 
 
-    def adjust_escale(self,escale):
-        if self.image_editor is not None:
-            self.image_editor.escale = float(escale)
-        self.escale = float(escale)
+    def adjust_escale(self,frame):
+        if frame.escaler is not None:
+            try:
+                self.escale = float(self.str_scale.get())
+            except ValueError:
+                print('Cannot interpret input {} exposure scale as a float.'.format(frame.str_scale.get()))
+                return
+            if self.image_editor is not None:
+                self.image_editor.escale = self.escale
+
 
     def get_img_info(self,frame):
         fname = ntpath.basename(self.filepath)
@@ -190,10 +213,10 @@ class ImageRotator(tk.Frame):
         tk.Button(self,text="Next",command=self.next_page).place(x=nbbx+180,y=nbby)
        
         # exposure scale
-        self.scaler_x,self.scaler_y = 380,210
-        tk.Button(self, text="Apply",command=self.re_init).place(x=self.scaler_x+30,y=self.scaler_y+60)
-        self.str_scale = None
-        self.init_escaler()
+        self.escale_label = None
+        self.escale_apply = None
+        self.escaler = None
+        self.controller.init_escaler(self)
 
         # nmice selector
         self.rbx,self.rby = 20,240
@@ -210,17 +233,10 @@ class ImageRotator(tk.Frame):
 
     def re_init(self):
         self.controller.init_img_info(self)
-        self.init_escaler()
+        self.controller.init_escaler(self)
         self.init_nmice_select()
         self.init_ani()
 
-    def init_escaler(self):
-        try:
-            self.escaler.destroy()
-        except:
-            pass
-        self.escaler = self.controller.make_escale(self)
-        self.escaler.place(x=self.scaler_x,y=self.scaler_y)
 
     def init_ani(self):
         self.animate_axes()
@@ -284,10 +300,10 @@ class ImageCutter(tk.Frame):
         tk.Button(self,text="Recenter",command=self.recenter).place(x=rbx,y=rby)
 
         # exposure scale
-        self.scaler_x,self.scaler_y = 380,210
-        self.str_scale = None
-        tk.Button(self, text="Apply",command=self.init_ani).place(x=self.scaler_x+30,y=self.scaler_y+60)
-        self.init_escaler()
+        self.escale_label = None
+        self.escale_apply = None
+        self.escaler = None
+        self.controller.init_escaler(self)
 
         # back, next
         nbbx,nbby = 135,400
@@ -307,20 +323,12 @@ class ImageCutter(tk.Frame):
     def re_init(self):
         self.controller.init_img_info(self)
         self.controller.view_ax = 'z'
-        self.init_escaler()
+        self.controller.init_escaler(self)
         self.init_ani()
 
     def back(self):
         self.controller.image_editor.stop_animation()
         self.controller.show_frame('ImageRotator')
-
-    def init_escaler(self):
-        try:
-            self.escaler.destroy()
-        except:
-            pass
-        self.escaler = self.controller.make_escale(self)
-        self.escaler.place(x=self.scaler_x,y=self.scaler_y)
 
     def init_ani(self):
         self.start_cutter()
@@ -364,25 +372,16 @@ class CutViewer(tk.Frame):
         tk.Button(self,text="View collapsed z-axis",command=lambda:self.change_ax('z')).place(x=vbx,y=vby+60)
         
         # exposure scale
-        self.scaler_x,self.scaler_y = 380,210
-        tk.Button(self, text="Apply",command=self.re_init).place(x=self.scaler_x+30,y=self.scaler_y+60)
-        self.str_scale = None
-        self.init_escaler()
+        self.escale_label = None
+        self.escale_apply = None
+        self.escaler = None
+        self.controller.init_escaler(self)
         
 
     def re_init(self):
         self.controller.init_img_info(self)
-        self.init_escaler()
+        self.controller.init_escaler(self)
         self.init_ani()
-
-
-    def init_escaler(self):
-        try:
-            self.escaler.destroy()
-        except:
-            pass
-        self.escaler = self.controller.make_escale(self)
-        self.escaler.place(x=self.scaler_x,y=self.scaler_y)
 
     def init_ani(self):
         self.animate_cuts()
