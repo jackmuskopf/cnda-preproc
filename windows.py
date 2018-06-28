@@ -138,11 +138,15 @@ class ImageSelector(tk.Frame):
 
         self.pet_buttons = []
         for pet in self.pet_files:
-            self.pet_buttons.append(tk.Button(self, text=ntpath.basename(pet), command=lambda pet=pet: controller.start_pet(pet)))
+            self.pet_buttons.append(
+                tk.Button(self, 
+                text=ntpath.basename(pet), 
+                command=lambda pet=pet: controller.start_pet(pet)))
             self.pet_buttons[-1].pack()
 
-        self.close_button = tk.Button(self, text="Close", command=controller.quit)
-        self.close_button.pack()
+
+    def re_init(self):
+        self.controller.nmice=None
 
 
 
@@ -180,12 +184,11 @@ class ImageRotator(tk.Frame):
         tk.Button(self, text="Apply",command=self.re_init).place(x=self.scaler_x+30,y=self.scaler_y+60)
         self.init_escaler()
 
-        rbx,rby = 20,240
-        tk.Label(self, text="Number of mice:").place(x=rbx,y=rby-20)
-        self.tknmice = tk.IntVar()
-        R1 = tk.Radiobutton(self, text="1 mouse", variable=self.tknmice, value=1,command=self.set_nmice).place(x=rbx,y=rby)
-        R2 = tk.Radiobutton(self, text="2 mice", variable=self.tknmice, value=2,command=self.set_nmice).place(x=rbx,y=rby+20)
-        R3 = tk.Radiobutton(self, text="3 or 4 mice", variable=self.tknmice, value=4,command=self.set_nmice).place(x=rbx,y=rby+40)
+        self.rbx,self.rby = 20,240
+        tk.Label(self, text="Number of mice:").place(x=self.rbx,y=self.rby-20)
+        self.R1,self.R2,self.R3,self.tknmice = None,None,None,None
+        self.init_nmice_select()
+ 
 
         rotbx,rotby = 200,220
         tk.Button(self, text="rotate on x axis", command=lambda : self.rotate_on_axis('x')).place(x=rotbx,y=rotby)
@@ -196,6 +199,7 @@ class ImageRotator(tk.Frame):
     def re_init(self):
         self.controller.init_img_info(self)
         self.init_escaler()
+        self.init_nmice_select()
         self.init_ani()
 
     def init_escaler(self):
@@ -208,6 +212,19 @@ class ImageRotator(tk.Frame):
 
     def init_ani(self):
         self.animate_axes()
+
+    def init_nmice_select(self):
+        if self.controller.nmice is None:
+            self.tknmice = tk.IntVar()      
+            for r in [self.R1,self.R2,self.R3]:
+                if r is not None:
+                    r.destroy()
+            self.R1 = tk.Radiobutton(self, text="1 mouse", variable=self.tknmice, value=1, command=self.set_nmice)
+            self.R2 = tk.Radiobutton(self, text="2 mice", variable=self.tknmice, value=2, command=self.set_nmice)
+            self.R3 = tk.Radiobutton(self, text="3 or 4 mice", variable=self.tknmice, value=4, command=self.set_nmice)
+            self.R1.place(x=self.rbx,y=self.rby)
+            self.R2.place(x=self.rbx,y=self.rby+20)
+            self.R3.place(x=self.rbx,y=self.rby+40)
 
     def back(self):
         self.controller.image_editor.stop_animation()
