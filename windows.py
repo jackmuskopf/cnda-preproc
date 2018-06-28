@@ -97,9 +97,15 @@ class ImageGUI(tk.Tk):
         self.show_frame("ImageRotator")
 
 
-    def get_escaler(self, frame):
-        escaler = tk.Scale(frame, from_=1, to=100, resolution=.05, orient=tk.HORIZONTAL, label='Exposure', command=self.adjust_escale)
-        escaler.set(self.escale)
+    # def make_escale(self, frame):
+    #     escaler = tk.Scale(frame, from_=1, to=100, resolution=.05, orient=tk.HORIZONTAL, label='Exposure', command=self.adjust_escale)
+    #     escaler.set(self.escale)
+    #     return escaler
+
+    def make_escale(self, frame):
+        frame.str_scale = tk.StringVar()
+        frame.str_scale.set(str(self.escale))
+        escaler = tk.Entry(frame,textvariable=frame.str_scale)
         return escaler
 
 
@@ -157,15 +163,18 @@ class ImageRotator(tk.Frame):
         self.controller = controller
         self.img_info = None
         
+        # title
         label = tk.Label(self, text="Image Rotator", font=controller.title_font)
         label.pack(side="top", fill="x", pady=10)
         
+        # indicate nmice reminder
         tk.Label(self, 
             text="Number of mice must be indicated before continuing.", 
             font=tkfont.Font(family='Helvetica', size=12, weight="bold"),
             fg='red'
             ).pack(side="top",fill="x",pady=15)
 
+        # rotator instructions
         tk.Label(self, 
             text="\n".join([
                 'Notes on rotation:',
@@ -175,15 +184,18 @@ class ImageRotator(tk.Frame):
             justify=tk.LEFT
             ).place(x=20,y=320)
 
+        # next, back
         nbbx,nbby = 135,400
         tk.Button(self, text="Back",command=self.back).place(x=nbbx,y=nbby)
         tk.Button(self,text="Next",command=self.next_page).place(x=nbbx+180,y=nbby)
        
-        
+        # exposure scale
         self.scaler_x,self.scaler_y = 380,210
         tk.Button(self, text="Apply",command=self.re_init).place(x=self.scaler_x+30,y=self.scaler_y+60)
+        self.str_scale = None
         self.init_escaler()
 
+        # nmice selector
         self.rbx,self.rby = 20,240
         tk.Label(self, text="Number of mice:").place(x=self.rbx,y=self.rby-20)
         self.R1,self.R2,self.R3,self.tknmice = None,None,None,None
@@ -207,7 +219,7 @@ class ImageRotator(tk.Frame):
             self.escaler.destroy()
         except:
             pass
-        self.escaler = self.controller.get_escaler(self)
+        self.escaler = self.controller.make_escale(self)
         self.escaler.place(x=self.scaler_x,y=self.scaler_y)
 
     def init_ani(self):
@@ -263,20 +275,26 @@ class ImageCutter(tk.Frame):
         self.controller = controller
         self.img_info = None
 
+        # title
         label = tk.Label(self, text="Image Cutter", font=controller.title_font)
         label.pack(side="top", fill="x", pady=10)
 
+        # recenter crosshairs
         rbx,rby = 20,240
         tk.Button(self,text="Recenter",command=self.recenter).place(x=rbx,y=rby)
 
+        # exposure scale
         self.scaler_x,self.scaler_y = 380,210
+        self.str_scale = None
         tk.Button(self, text="Apply",command=self.init_ani).place(x=self.scaler_x+30,y=self.scaler_y+60)
         self.init_escaler()
 
+        # back, next
         nbbx,nbby = 135,400
         tk.Button(self, text="Back",command=self.back).place(x=nbbx,y=nbby)
         tk.Button(self,text="Cut Image",command=self.do_cut).place(x=nbbx+180,y=nbby)
 
+        # view axes
         vbx, vby = 200,220
         viewy = tk.Button(self,text="View collapsed y-axis",command=lambda:self.change_ax('y')).place(x=vbx,y=vby)
         viewz = tk.Button(self,text="View collapsed z-axis",command=lambda:self.change_ax('z')).place(x=vbx,y=vby+30)
@@ -301,7 +319,7 @@ class ImageCutter(tk.Frame):
             self.escaler.destroy()
         except:
             pass
-        self.escaler = self.controller.get_escaler(self)
+        self.escaler = self.controller.make_escale(self)
         self.escaler.place(x=self.scaler_x,y=self.scaler_y)
 
     def init_ani(self):
@@ -334,18 +352,21 @@ class CutViewer(tk.Frame):
         label = tk.Label(self, text="Review", font=controller.title_font)
         label.pack(side="top", fill="x", pady=10)
 
-        # back button
+        # back, next
         nbbx,nbby = 135,400
         tk.Button(self, text="Back",command=self.back).place(x=nbbx,y=nbby)
         tk.Button(self, text="Save").place(x=nbbx+180,y=nbby)
 
+        # view axes
         vbx, vby = 200,220
         tk.Button(self,text="View collapsed x-axis",command=lambda:self.change_ax('x')).place(x=vbx,y=vby)
         tk.Button(self,text="View collapsed y-axis",command=lambda:self.change_ax('y')).place(x=vbx,y=vby+30)
         tk.Button(self,text="View collapsed z-axis",command=lambda:self.change_ax('z')).place(x=vbx,y=vby+60)
         
+        # exposure scale
         self.scaler_x,self.scaler_y = 380,210
         tk.Button(self, text="Apply",command=self.re_init).place(x=self.scaler_x+30,y=self.scaler_y+60)
+        self.str_scale = None
         self.init_escaler()
         
 
@@ -360,7 +381,7 @@ class CutViewer(tk.Frame):
             self.escaler.destroy()
         except:
             pass
-        self.escaler = self.controller.get_escaler(self)
+        self.escaler = self.controller.make_escale(self)
         self.escaler.place(x=self.scaler_x,y=self.scaler_y)
 
     def init_ani(self):
