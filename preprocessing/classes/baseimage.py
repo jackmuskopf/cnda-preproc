@@ -2,6 +2,7 @@ import os
 import sys
 import struct
 import numpy as np
+import ntpath
 from collections import namedtuple
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -15,6 +16,7 @@ class BaseImage:
         self.img_data = img_data
         self.ax_map = {'z':0,'y':1,'x':2}
         self.frame_range = frame_range
+        self.subject_id = ntpath(filepath).split('_')[0]
 
 
     def load_header(self):

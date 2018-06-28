@@ -420,15 +420,6 @@ class ImageEditor(ImageViewer):
 		cuts = self.image.cuts
 		cuts = [cut.img_data for cut in cuts]
 		
-		# # join data if necessary
-		# if self.nmice == 4 and axis in [1,2]:
-		# 	if axis == 1:
-		# 		# join on y axis
-		# 		cuts = [np.concatenate([cuts[0],cuts[2]],axis=1),np.concatenate([cuts[1],cuts[3]],axis=1)]
-		# 	else:
-		# 		# join on x axis
-		# 		cuts = [np.concatenate([cuts[0],cuts[1]],axis=2),np.concatenate([cuts[2],cuts[3]],axis=2)]	
-
 
 		cuts = [getattr(img_data,self.collapse)(axis=axis)*scale for img_data in cuts]
 		cuts = [split_frames(img_data) for img_data in cuts]
@@ -460,15 +451,15 @@ class ImageEditor(ImageViewer):
 				w3 = (w1+w2)/2
 				h1,h2 = shapes[0][0],shapes[2][0]			
 				grid = gridspec.GridSpec(2, 4, height_ratios=[h1,h2], width_ratios=[w1,w2,w3,w3])				
-				
-			elif axis == 1:
+				axes = [plt.subplot(grid[k//2,k%2]) for k in range(4)]
+			elif axis == 1:	# y axis
 				w1,w2 = shapes[0][1],shapes[1][1]
 				grid = gridspec.GridSpec(2,4,width_ratios=[w1,w2,w1,w2])
-
-			else:
+				axes = [plt.subplot(grid[k//2,k%2]) for k in range(4)]
+			else:	# x axis
 				h1,h2 = shapes[0][0],shapes[1][0]
-				grid = gridspec.GridSpec(2, 4, height_ratios=[h1,h2])
-			axes = [plt.subplot(grid[k//2,k%2]) for k in range(4)]	
+				grid = gridspec.GridSpec(4, 4, height_ratios=[h1,h1,h2,h2])
+				axes = [plt.subplot(grid[i,:2]) for i in range(4)]
 
 		else:
 			raise ValueError('Unexpected nmice in ImageEditor.animate_cuts: {}'.format(self.nmice))
