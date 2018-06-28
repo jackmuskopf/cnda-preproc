@@ -8,7 +8,6 @@ from collections import defaultdict
 from tkinter import font  as tkfont 
 from preprocessing.classes.baseimage import *
 from preprocessing.classes.imageviewer import *
-from preprocessing.classes.ctimage import *
 from preprocessing.settings import *
 
 
@@ -184,12 +183,13 @@ class ImageGUI(tk.Tk):
 
     def get_img_info(self,frame):
         fname = self.image_editor.image.filename
-        nframes = self.image_editor.image.nframes
         nmice = self.nmice if self.nmice is not None else '?'
-        text = '\n'.join(['File : {}',
-                        'Number of frames : {}',
-                        'Number of mice : {}'
-            ]).format(fname,nframes,nmice)
+        z,y,x,frames = self.image_editor.image.img_data.shape
+        text = '\n'.join(['File : {}'.format(fname),
+                        'Number of frames : {}'.format(frames),
+                        'Frame dimensions : ({0}, {1}, {2})'.format(x,y,z),
+                        'Number of mice : {}'.format(nmice)
+            ])
         label = tk.Label(frame,text=text,font=tkfont.Font(family='Helvetica', size=9),justify=tk.LEFT)
         return label
 
