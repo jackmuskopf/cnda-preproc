@@ -485,7 +485,7 @@ class CutViewer(tk.Frame):
         self.animate_cuts()
 
     def save_cuts(self):
-        self.controller.image_editor.image.save_cuts()
+        self.controller.image_editor.image.save_cuts(path=os.path.join('data','pcds','output'))
 
 if __name__ == "__main__":
     data_folder = os.path.join('data','pcds')

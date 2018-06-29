@@ -224,12 +224,12 @@ class BaseImage:
         return
 
 
-    def save_cuts(self,path=None):
+    def save_cuts(self,path):
         print('Saving files...')
         if self.cuts is None:
             raise ValueError('Image has not been cut in BaseImage.save_cuts()')
         if path is None:
-            path = os.path.join('..','..','data','output')
+            raise ValueError('Path not specified')
         sf  = self.struct_flags[self.params.data_type]
 
         hdr_file = open(self.header_file, 'r')
@@ -255,6 +255,7 @@ class BaseImage:
             with open(os.path.join(path,cut_filename),'wb') as df:
                 for d in out_data:
                     df.write(struct.pack(sf,d))
+            print('Files saved.')
 
 
 
