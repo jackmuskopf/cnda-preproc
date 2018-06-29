@@ -470,9 +470,9 @@ class ImageEditor(ImageViewer):
 		if len(axes) != len(cuts):
 			raise ValueError('Uneven axes and cuts.')
 		pairs = [[axes[j],cuts[j]] for j in range(len(axes))]
-		for p in pairs:
+		for i,p in enumerate(pairs):
 			ax,cl = p
-			ax.set_title('New SubImage')
+			ax.set_title('New SubImage ({})'.format(i+1))
 			by,bx = cl[0].shape
 			ax.set_xlim(0,bx),ax.set_ylim(0,by)
 		by,bx = fmats[0].shape

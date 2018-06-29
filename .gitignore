@@ -6,4 +6,7 @@ __pycache__/
 
 # ignore all data
 data/
+output/
+
+# ignore all ipynb_checkpoints
 .ipynb_checkpoints/

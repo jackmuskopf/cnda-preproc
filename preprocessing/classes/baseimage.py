@@ -19,6 +19,7 @@ class BaseImage:
         if filepath is not None:
             self.filename = ntpath.basename(filepath)
             self.subject_id = self.filename.split('_')[0]
+        self.cuts = None
 
 
     def load_header(self):
@@ -221,6 +222,29 @@ class BaseImage:
 
         return
 
+
+    def save_cuts(self,path=None):
+        if self.cuts is None:
+            raise ValueError('Image has not been cut in BaseImage.save_cuts()')
+        hdr_file = open(self.header_file, 'r')
+        hdr_string = hdr_file.read()
+        hdr_lines = hdr_string.split('\n')
+        for i,cut_img in enumerate(self.cuts()):
+            cut_hdr_lines = hdr_lines
+            for dim in ['x_dimension','y_dimension','z_dimension']:
+                for j,line in enumerate(cut_hdr_lines):
+                    if line.strip().startswith(dim):
+                        cut_hdr_lines[j] = ' '.join([dim,str(getattr(cut_img,dim))])
+                        break
+            fnpcs = self.filename.split('.')
+            fnpcs[0] = fnpcs[0] + '_{}'.format(i+1)
+            cut_filename = '.'.join(fnpcs)
+            cut_hdr_str = '\n'.join(cut_hdr_lines)
+            
+
+
+
+
     def get_axis(self,axis):
         '''
         converts axis x,y,z to 2,1,0 for use with numpy
@@ -297,6 +321,7 @@ class SubPET(BaseImage):
         self.scaled = parent_image.scaled
         shape = self.img_data.shape
         self.zdim, self.ydim, self.xdim, self.nframes = shape
+        self.x_dimension,self.y_dimension,self.z_dimension = self.xdim,self.ydim,self.zdim
         self.bounds={0 : (self.ydim, self.xdim), 
                     1 : (self.xdim, self.zdim),
                     2 : (self.zdim, self.ydim)}
@@ -348,7 +373,6 @@ class PETImage(BaseImage):
                     2 : (self.zdim, self.ydim)}
         self.scaled = None
 
-        self.cuts = None
 
 
 
