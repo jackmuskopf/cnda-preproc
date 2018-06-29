@@ -443,7 +443,7 @@ class CutViewer(tk.Frame):
         # back, next
         nbbx,nbby = 135,400
         tk.Button(self, text="Back",command=self.back).place(x=nbbx,y=nbby)
-        tk.Button(self, text="Save").place(x=nbbx+180,y=nbby)
+        tk.Button(self, text="Save",command=self.save_cuts).place(x=nbbx+180,y=nbby)
 
         # view axes
         vbx, vby = 200,220
@@ -483,6 +483,9 @@ class CutViewer(tk.Frame):
     def change_ax(self,ax):
         self.controller.view_ax = ax
         self.animate_cuts()
+
+    def save_cuts(self):
+        self.controller.image_editor.image.save_cuts()
 
 if __name__ == "__main__":
     data_folder = os.path.join('data','pcds')

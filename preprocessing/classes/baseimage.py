@@ -15,6 +15,12 @@ class BaseImage:
         self.filepath = filepath
         self.img_data = img_data
         self.ax_map = {'z':0,'y':1,'x':2}
+        self.struct_flags = {
+                                1:'b',
+                                2:'h',
+                                3:'i',
+                                4:'f'
+                            }
         self.frame_range = frame_range
         if filepath is not None:
             self.filename = ntpath.basename(filepath)
@@ -174,14 +180,9 @@ class BaseImage:
             3:4,
             4:4
         }
-        struct_flags = {
-            1:'b',
-            2:'h',
-            3:'i',
-            4:'f'
-        }
+
         bpp = bytes_per_pixel[ps.data_type]
-        sf = struct_flags[ps.data_type]
+        sf = self.struct_flags[ps.data_type]
 
         # read data from file
         print('Reading image data...')
@@ -224,12 +225,17 @@ class BaseImage:
 
 
     def save_cuts(self,path=None):
+        print('Saving files...')
         if self.cuts is None:
             raise ValueError('Image has not been cut in BaseImage.save_cuts()')
+        if path is None:
+            path = os.path.join('..','..','data','output')
+        sf  = self.struct_flags[self.params.data_type]
+
         hdr_file = open(self.header_file, 'r')
         hdr_string = hdr_file.read()
         hdr_lines = hdr_string.split('\n')
-        for i,cut_img in enumerate(self.cuts()):
+        for i,cut_img in enumerate(self.cuts):
             cut_hdr_lines = hdr_lines
             for dim in ['x_dimension','y_dimension','z_dimension']:
                 for j,line in enumerate(cut_hdr_lines):
@@ -239,9 +245,16 @@ class BaseImage:
             fnpcs = self.filename.split('.')
             fnpcs[0] = fnpcs[0] + '_{}'.format(i+1)
             cut_filename = '.'.join(fnpcs)
+            cut_hdr_name = cut_filename+'.hdr'
             cut_hdr_str = '\n'.join(cut_hdr_lines)
-            
 
+            with open(os.path.join(path,cut_hdr_name),'w') as hf:
+                hf.write(cut_hdr_str)
+
+            out_data = cut_img.img_data.flatten()
+            with open(os.path.join(path,cut_filename),'wb') as df:
+                for d in out_data:
+                    df.write(struct.pack(sf,d))
 
 
 
