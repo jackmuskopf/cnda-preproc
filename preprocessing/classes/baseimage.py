@@ -77,6 +77,8 @@ class BaseImage:
         of the plane or frame to include; 
         - index from 0, e.g. for the first 40 planes, use [0,39]
         '''
+        x,y,z,fs = self.params.x_dimension,self.params.y_dimension,self.params.z_dimension,self.params.total_frames
+        print('File dimensions: ({},{},{},{})'.format(x,y,z,fs))
         ps = self.params
 
         if plane_range is None:

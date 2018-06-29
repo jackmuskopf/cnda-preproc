@@ -466,11 +466,13 @@ class ImageEditor(ImageViewer):
 			raise ValueError('Unexpected nmice in ImageEditor.animate_cuts: {}'.format(self.nmice))
 
 		full_ax = plt.subplot(grid[:,2:])
+		full_ax.set_title('Original')
 		if len(axes) != len(cuts):
 			raise ValueError('Uneven axes and cuts.')
 		pairs = [[axes[j],cuts[j]] for j in range(len(axes))]
 		for p in pairs:
 			ax,cl = p
+			ax.set_title('New SubImage')
 			by,bx = cl[0].shape
 			ax.set_xlim(0,bx),ax.set_ylim(0,by)
 		by,bx = fmats[0].shape
