@@ -388,8 +388,16 @@ class ImageCutter(tk.Frame):
         label.pack(side="top", fill="x", pady=10)
 
         # recenter crosshairs
-        rbx,rby = 20,240
+        rbx,rby = 200,340
         tk.Button(self,text="Recenter",command=self.recenter).place(x=rbx,y=rby)
+
+        # choose cutter
+        cbx,cby = 20,220
+        tk.Button(self,text="Cross",command=lambda:self.set_cutter('cross')).place(x=cbx,y=cby)
+        tk.Button(self,text="Up T",command=lambda:self.set_cutter('up_T')).place(x=cbx,y=cby+30)
+        tk.Button(self,text="Down T",command=lambda:self.set_cutter('down_T')).place(x=cbx,y=cby+60)
+        tk.Button(self,text="Horizontal",command=lambda:self.set_cutter('horizontal')).place(x=cbx,y=cby+90)
+        tk.Button(self,text="Vertical",command=lambda:self.set_cutter('vertical')).place(x=cbx,y=cby+120)
 
         # exposure scale
         self.escale_label = None
@@ -432,6 +440,10 @@ class ImageCutter(tk.Frame):
     def change_ax(self,ax):
         self.controller.view_ax = ax
         self.start_cutter()
+
+    def set_cutter(self,cutter):
+        self.controller.image_editor.cutter=cutter
+        self.re_init()
 
     def do_cut(self):
         self.controller.image_editor.cut_image()

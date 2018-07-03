@@ -3,7 +3,7 @@ import matplotlib.animation as animation
 import matplotlib.gridspec as gridspec
 import numpy as np
 import warnings
-from .baseimage import PETImage, SubPET
+from .baseimage import PETImage, SubImage
 
 class ImageViewer:
 
@@ -250,8 +250,20 @@ class ImageEditor(ImageViewer):
 		ImageViewer.__init__(self, image, collapse=collapse, escale=escale)
 
 		# for displaying cut
-		self.line_map = {4:2, 2:1, 1:0}
 		self.nmice = nmice
+		self.cutter = 'cross'
+		self.line_map = {'cross' : 2,
+						'up_T' : 2,
+						'down_T' : 2,
+						'horizontal' : 1,
+						'vertical' : 1,
+						'no_cut' : 0}
+		self.cut_map = {'cross' : 4,
+						'up_T' : 3,
+						'down_T' : 3,
+						'horizontal' : 2,
+						'vertical' : 2,
+						'no_cut' : 1}
 
 	def check_nmice(self):
 		if self.nmice not in range(1,5):
@@ -259,7 +271,7 @@ class ImageEditor(ImageViewer):
 
 
 
-	def animated_cutter(self, view_ax='z', method='collapse', frame_range=None, slice_ix=None):
+	def animated_cutter(self, view_ax='z', cutter=None, method='collapse', frame_range=None, slice_ix=None):
 
 		def genIx():
 			dt = 1
@@ -271,21 +283,38 @@ class ImageEditor(ImageViewer):
 
 		def genAni(k):
 			cx,cy = (self.cx, self.cy)
-			lp = [[[cx,cx],[0,by]],
-				  [[0,bx],[cy,cy]]]
+			if self.cutter == 'up_T':
+				lp = [[[cx,cx],[cy,by]],
+				  	[[0,bx],[cy,cy]]]
+			elif self.cutter == 'down_T':
+				lp = [[[cx,cx],[0,cy]],
+				  	[[0,bx],[cy,cy]]]
+			else:
+				lp = [[[cx,cx],[0,by]],
+				  	[[0,bx],[cy,cy]]]
 
-			if self.nmice == 2:
+
+			if self.cutter == 'vertical':
 				lines[0].set_data(lp[0])
-			elif self.nmice == 4:
+			elif self.cutter == 'horizontal':
+				lines[0].set_data(lp[1])
+			elif self.cutter in ['cross','up_T','down_T']:
 				for j,line in enumerate(lines):
 					line.set_data(lp[j])
 			else:
-				raise ValueError('Unexpected nmice in animated_cutter: {}'.format(self.nmice))
+				raise ValueError('Unexpected cutter in animated_cutter: {}'.format(self.cutter))
 
 			img.set_array(mats[k])
 			return patches
 
-		self.check_nmice()
+		if cutter is None:
+			cutter = self.cutter
+
+		# check cutting method
+		if cutter not in ['cross','up_T','down_T','horizontal','vertical']:
+			raise ValueError('Unexpected cutting method in animated_cutter: {}'.format(cutter))
+		else:
+			self.cutter = cutter
 
 		# method routine
 		if method not in ['collapse','slice','each_slice']:
@@ -312,12 +341,12 @@ class ImageEditor(ImageViewer):
 			mats =  mats + mats
 
 		self.pause = False
-		nlines = self.line_map[self.nmice]
+		nlines = self.line_map[self.cutter]
 		view_ax = self.image.get_axis(view_ax)
 		bx,by = self.image.bounds[view_ax]
 
-		if self.nmice > 2 and view_ax !=0:
-			raise ValueError('Must cut images with {} mice via z-axis view.'.format(self.nmice))
+		if self.cutter in ['up_T','down_T','cross'] and view_ax !=0:
+			raise ValueError('Must use {} cutter in z-axis view.'.format(self.cutter))
 		if view_ax == 2:
 			raise ValueError('Cannot cut images in x-axis view.')
 
@@ -348,8 +377,8 @@ class ImageEditor(ImageViewer):
 			img_data = self.image.img_data
 			left_half = img_data[:,:,:cx,:]
 			right_half = img_data[:,:,cx:,:]
-			left_im = SubPET(parent_image=self.image, img_data=left_half)
-			right_im = SubPET(parent_image=self.image, img_data=right_half)
+			left_im = SubImage(parent_image=self.image, img_data=left_half)
+			right_im = SubImage(parent_image=self.image, img_data=right_half)
 			
 			self.image.cuts = (left_im, right_im)
 			return self.image.cuts
@@ -370,10 +399,10 @@ class ImageEditor(ImageViewer):
 			top_right = right_half[:,cy:,:,:]
 
 
-			tl = SubPET(parent_image=self.image, img_data=top_left)
-			tr = SubPET(parent_image=self.image, img_data=top_right)
-			bl = SubPET(parent_image=self.image, img_data=bottom_left)
-			br = SubPET(parent_image=self.image, img_data=bottom_right)
+			tl = SubImage(parent_image=self.image, img_data=top_left)
+			tr = SubImage(parent_image=self.image, img_data=top_right)
+			bl = SubImage(parent_image=self.image, img_data=bottom_left)
+			br = SubImage(parent_image=self.image, img_data=bottom_right)
 
 			self.image.cuts = (tl,tr,bl,br)
 

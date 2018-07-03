@@ -343,12 +343,12 @@ class BaseImage:
         return mats
 
 
-class SubPET(BaseImage):
+class SubImage(BaseImage):
 
     def __init__(self, parent_image, img_data, filepath=None):
 
         BaseImage.__init__(self, filepath=filepath, img_data=img_data)
-        self.type = 'pet'
+        self.type = parent_image.type
         self.parent_image = parent_image
         self.frame_range = parent_image.frame_range
         self.plane_range = parent_image.plane_range
