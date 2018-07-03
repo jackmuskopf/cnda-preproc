@@ -118,6 +118,8 @@ class ImageViewer:
 		if self.is_x(view_ax):
 			mats = self.swap_x(mats)
 		
+		mats.reverse()
+
 		if get_mats:
 			return mats
 		else:
@@ -325,7 +327,6 @@ class ImageEditor(ImageViewer):
 
 		if method == 'collapse':	# add frame_range info
 			mats = self.animate_collapse(view_ax=view_ax, get_mats=True)
-			mats.reverse()
 		elif method == 'slice':		# add frame_range info
 			if slice_ix is None:
 				print('No slice index indicated. Using 0.')
@@ -343,10 +344,12 @@ class ImageEditor(ImageViewer):
 		self.pause = False
 		nlines = self.line_map[self.cutter]
 		view_ax = self.image.get_axis(view_ax)
-		bx,by = self.image.bounds[view_ax]
+		by,bx = mats[0].shape
 
 		if self.cutter in ['up_T','down_T','cross'] and view_ax !=0:
 			raise ValueError('Must use {} cutter in z-axis view.'.format(self.cutter))
+		elif self.cutter == 'horizontal' and view_ax == 1:
+			raise ValueError('Cannot cut images horizontally via y-axis view.')
 		if view_ax == 2:
 			raise ValueError('Cannot cut images in x-axis view.')
 
@@ -370,8 +373,6 @@ class ImageEditor(ImageViewer):
 	def cut_image(self):
 
 		cx,cy = self.cx,self.cy
-
-		# self.ax_map = {'z':0,'y':1,'x':2}
 
 		# cut in half in y,z plane
 		if self.cutter == 'vertical':

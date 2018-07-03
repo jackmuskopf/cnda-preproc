@@ -394,7 +394,8 @@ class ImageCutter(tk.Frame):
         tk.Button(self,text="Recenter",command=self.recenter).place(x=rbx,y=rby)
 
         # choose cutter
-        cbx,cby = 20,220
+        tk.Label(self,text='Choose cutter:').place(x=20,y=220)
+        cbx,cby = 20,240
         tk.Button(self,text="Cross",command=lambda:self.set_cutter('cross')).place(x=cbx,y=cby)
         tk.Button(self,text="Up T",command=lambda:self.set_cutter('up_T')).place(x=cbx,y=cby+30)
         tk.Button(self,text="Down T",command=lambda:self.set_cutter('down_T')).place(x=cbx,y=cby+60)
