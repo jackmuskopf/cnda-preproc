@@ -363,6 +363,8 @@ class ImageRotator(tk.Frame):
             self.controller.image_editor.stop_animation()
             if self.controller.image_editor.nmice == 1:
                 self.controller.view_ax = 'x'
+                im = self.controller.image_editor.image
+                self.controller.image_editor.image.cuts = [SubImage(im,im.img_data)]
                 self.controller.show_frame('CutViewer')
             else:
                 self.controller.show_frame('ImageCutter')

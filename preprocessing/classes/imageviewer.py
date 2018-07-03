@@ -366,25 +366,69 @@ class ImageEditor(ImageViewer):
 		plt.show()
 
 
+
 	def cut_image(self):
 
 		cx,cy = self.cx,self.cy
 
-		self.check_nmice()
+		# self.ax_map = {'z':0,'y':1,'x':2}
 
 		# cut in half in y,z plane
-		if self.nmice == 2:
+		if self.cutter == 'vertical':
 			img_data = self.image.img_data
 			left_half = img_data[:,:,:cx,:]
 			right_half = img_data[:,:,cx:,:]
+
 			left_im = SubImage(parent_image=self.image, img_data=left_half)
 			right_im = SubImage(parent_image=self.image, img_data=right_half)
 			
-			self.image.cuts = (left_im, right_im)
+			self.image.cuts = [left_im, right_im]
+			return self.image.cuts
+
+		elif self.cutter == 'horizontal':
+			img_data = self.image.img_data
+			top_half = img_data[:,cy:,:,:]
+			bottom_half = img_data[:,:cy,:,:]
+
+			top_im = SubImage(parent_image=self.image, img_data=top_half)
+			bottom_im = SubImage(parent_image=self.image, img_data=bottom_half)
+			
+			self.image.cuts = [top_im, bottom_im]
+			return self.image.cuts
+
+		elif self.cutter == 'down_T':
+			img_data = self.image.img_data
+			top_half = img_data[:,cy:,:,:]
+			bottom_half = img_data[:,:cy,:,:]
+
+			bottom_left = bottom_half[:,:,:cx,:]
+			bottom_right = bottom_half[:,:,cx:,:]
+
+			top_im = SubImage(parent_image=self.image, img_data=top_half)
+			bl = SubImage(parent_image=self.image, img_data=bottom_left)
+			br = SubImage(parent_image=self.image, img_data=bottom_right)
+			
+			self.image.cuts = [top_im, bl, br]
+			return self.image.cuts
+
+
+		elif self.cutter == 'up_T':
+			img_data = self.image.img_data
+			top_half = img_data[:,cy:,:,:]
+			bottom_half = img_data[:,:cy,:,:]
+
+			top_left = top_half[:,:,:cx,:]
+			top_right = top_half[:,:,cx:,:]
+
+			tl = SubImage(parent_image=self.image, img_data=top_left)
+			tr = SubImage(parent_image=self.image, img_data=top_right)
+			bottom_im = SubImage(parent_image=self.image, img_data=bottom_half)
+
+			self.image.cuts = [tl, tr, bottom_im]
 			return self.image.cuts
 
 		# cut in quadrants in y,z and x,z planes
-		elif self.nmice in [3,4]:
+		elif self.cutter == 'cross':
 			img_data = self.image.img_data
 			
 			# cut in half in y,z
@@ -404,15 +448,11 @@ class ImageEditor(ImageViewer):
 			bl = SubImage(parent_image=self.image, img_data=bottom_left)
 			br = SubImage(parent_image=self.image, img_data=bottom_right)
 
-			self.image.cuts = (tl,tr,bl,br)
+			self.image.cuts = [tl,tr,bl,br]
 
 			return self.image.cuts
-
-
-		elif self.nmice == 1:
-			raise ValueError('Do not need to cut image with 1 mouse.')
 		else:
-			raise ValueError('ImageEditor with nmice = {} calling self.cut_image()')
+			raise ValueError('ImageEditor with cutter = {} calling self.cut_image()'.format(self.cutter))
 
 
 	def animate_cuts(self, view_ax='z'):
@@ -449,6 +489,7 @@ class ImageEditor(ImageViewer):
 
 		cuts = self.image.cuts
 		cuts = [cut.img_data for cut in cuts]
+		ncuts = len(cuts)
 		
 
 		cuts = [getattr(img_data,self.collapse)(axis=axis)*scale for img_data in cuts]
@@ -466,7 +507,8 @@ class ImageEditor(ImageViewer):
 		# plotting
 		fig = plt.figure()
 		shapes = [cl[0].shape for cl in cuts]	# for grid formatting
-		if self.nmice == 2:
+		
+		if self.cutter == 'vertical':
 			w1,w2 = shapes[0][1],shapes[1][1]
 			grid = gridspec.GridSpec(2,4,width_ratios=[w1,w2,w1,w2])
 			if axis in [0,1]: # z or y
@@ -474,8 +516,50 @@ class ImageEditor(ImageViewer):
 			else: # x
 				axes = [plt.subplot(grid[0,:2]),plt.subplot(grid[1,:2])]
 
+		elif self.cutter == 'horizontal':
+			h1,h2 = shapes[0][0],shapes[1][0]
+			
+			if axis in [0,2]: # z or x
+				grid = gridspec.GridSpec(2,4,height_ratios=[h1,h2])
+				axes = [plt.subplot(grid[0,:2]), plt.subplot(grid[1,:2])]	# tall in half
+			else: # y
+				grid = gridspec.GridSpec(2,3)
+				axes = [plt.subplot(grid[:,0]),plt.subplot(grid[:,1])]
+
+		elif self.cutter == 'up_T':
+			if axis == 0:								# quadrants
+				w1,w2 = shapes[0][1],shapes[1][1]
+				w3 = (w1+w2)/2
+				h1,h2 = shapes[0][0],shapes[2][0]			
+				grid = gridspec.GridSpec(2, 4, height_ratios=[h1,h2], width_ratios=[w1,w2,w3,w3])				
+				axes = [plt.subplot(grid[0,0]),plt.subplot(grid[0,1]),plt.subplot(grid[1,:2])]
+			elif axis == 1:	# y axis
+				w1,w2 = shapes[0][1],shapes[1][1]
+				grid = gridspec.GridSpec(2,4,width_ratios=[w1,w2,w1,w2])
+				axes = [plt.subplot(grid[0,0]),plt.subplot(grid[0,1]),plt.subplot(grid[1,:2])]
+			else:	# x axis
+				h1,h2 = shapes[0][0],shapes[2][0]
+				grid = gridspec.GridSpec(4, 4, height_ratios=[h1,h1,h2,h2])
+				axes = [plt.subplot(grid[0,:2]), plt.subplot(grid[1,:2]), plt.subplot(grid[2:,:2])]
+
+		elif self.cutter == 'down_T':
+			if axis == 0:								# quadrants
+				w1,w2 = shapes[1][1],shapes[2][1]
+				w3 = (w1+w2)/2
+				h1,h2 = shapes[0][0],shapes[1][0]			
+				grid = gridspec.GridSpec(2, 4, height_ratios=[h1,h2], width_ratios=[w1,w2,w3,w3])				
+				axes = [plt.subplot(grid[0,:2]),plt.subplot(grid[1,0]),plt.subplot(grid[1,1])]
+			elif axis == 1:	# y axis
+				w1,w2 = shapes[1][1],shapes[2][1]
+				grid = gridspec.GridSpec(2,4,width_ratios=[w1,w2,w1,w2])
+				axes = [plt.subplot(grid[0,:2]),plt.subplot(grid[1,0]),plt.subplot(grid[1,1])]
+			else:	# x axis
+				h1,h2 = shapes[0][0],shapes[1][0]
+				grid = gridspec.GridSpec(4, 4, height_ratios=[h1,h1,h2,h2])
+				axes = [plt.subplot(grid[:2,:2]), plt.subplot(grid[2,:2]), plt.subplot(grid[3,:2])]
+
 		# todo: animation
-		elif self.nmice == 4:
+		elif self.cutter == 'cross':
 			if axis == 0:								# quadrants
 				w1,w2 = shapes[0][1],shapes[1][1]
 				w3 = (w1+w2)/2
@@ -492,7 +576,7 @@ class ImageEditor(ImageViewer):
 				axes = [plt.subplot(grid[i,:2]) for i in range(4)]
 
 		else:
-			raise ValueError('Unexpected nmice in ImageEditor.animate_cuts: {}'.format(self.nmice))
+			raise ValueError('Unexpected cutter in ImageEditor.animate_cuts: {}'.format(self.cutter))
 
 		full_ax = plt.subplot(grid[:,2:])
 		full_ax.set_title('Original')
