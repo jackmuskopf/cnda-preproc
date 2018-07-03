@@ -4,8 +4,10 @@ if sys.platform == 'darwin':
     matplotlib.use('TkAgg')
 import ntpath
 import tkinter as tk
+from tkinter import Tk
 from collections import defaultdict                
 from tkinter import font  as tkfont 
+from tkinter.filedialog import askopenfilename, askdirectory
 from preprocessing.classes.baseimage import *
 from preprocessing.classes.imageviewer import *
 from preprocessing.settings import *
@@ -110,12 +112,6 @@ class ImageGUI(tk.Tk):
 
 
     def get_files(self):
-
-        def is_pet(fname):
-            if 'pet' in fname and '.ct' not in fname and fname.endswith('.img'):
-                return True
-            else:
-                return False
         
         fnames = [os.path.join(dp, f) for dp, dn, filenames in os.walk(self.folder) for f in filenames]
         pet_files =  [PETImage(f) for f in fnames if is_pet(f)]
@@ -226,8 +222,11 @@ class ImageSelector(tk.Frame):
         tk.Label(self,text=' '*25).grid(column=0)
 
         col_title_font = tkfont.Font(family='Helvetica', size=14)
-        tk.Label(self, text="PET Images", font=col_title_font).grid(row=1,column=self.petcol)
-        tk.Label(self, text="CT Images", font=col_title_font).grid(row=1,column=self.ctcol)
+        tk.Label(self, text="PET Images", font=col_title_font).grid(row=2,column=self.petcol)
+        tk.Label(self, text="CT Images", font=col_title_font).grid(row=2,column=self.ctcol)
+
+        # browse for file
+        tk.Button(self,text='Browse', command = self.browse_file).grid(row=1,column=1,columnspan=2,padx=(30,0),pady=(0,20))
 
         self.make_buttons()
 
@@ -254,8 +253,21 @@ class ImageSelector(tk.Frame):
                     b = tk.Button(self,
                         text=im.filename,
                         command = lambda im=im: self.controller.start_img(im))
-                    b.grid(row=i+2,column=column)
+                    b.grid(row=i+3,column=column)
                     self.buttons.append(b)
+
+    def browse_file(self):
+        Tk().withdraw()
+        fpath = askopenfilename()
+        if fpath.endswith('.hdr'):
+            fpath = '.'.join(fpath.split('.')[:-1])
+        fname = ntpath.basename(fpath)
+        if is_pet(fname):
+            img = PETImage(fpath)
+        else:
+            img = CTImage(fpath)
+        self.controller.start_img(img)
+
 
 
 
@@ -484,13 +496,28 @@ class CutViewer(tk.Frame):
         self.controller.view_ax = ax
         self.animate_cuts()
 
+
     def save_cuts(self):
+        Tk().withdraw()
+        save_path = askdirectory()
+        if not save_path:
+            save_path = os.path.join('data','pcds','output')
+            print('Saving to default folder: \n{}'.format(save_path))
         self.controller.make_splash(text='Saving images...')
-        self.controller.image_editor.image.save_cuts(path=os.path.join('data','pcds','output'))
+        self.controller.image_editor.image.save_cuts(path=save_path)
         self.controller.stop_splash()
         self.controller.image_editor.stop_animation()
         self.controller.frames['ImageSelector'].re_init()
         self.controller.show_frame('ImageSelector')
+
+
+def is_pet(fname):
+    if 'pet' in fname and '.ct' not in fname and fname.endswith('.img'):
+        return True
+    else:
+        return False
+
+
 
 if __name__ == "__main__":
     data_folder = os.path.join('data','pcds')
