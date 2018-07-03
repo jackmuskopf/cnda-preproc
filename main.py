@@ -16,7 +16,7 @@ from preprocessing.settings import *
 
 
 class LoadScreen(tk.Toplevel):
-    def __init__(self, parent):
+    def __init__(self, parent, text):
         tk.Toplevel.__init__(self, parent)
         w = 500 # width for the Tk root
         h = 250 # height for the Tk root
@@ -33,7 +33,7 @@ class LoadScreen(tk.Toplevel):
         # and where it is placed
         self.geometry('%dx%d+%d+%d' % (w, h, x, y))
         self.title("Image Preprocessing")
-        label = tk.Label(self, text="Loading Image...", font=tkfont.Font(family='Helvetica', size=18, weight="bold", slant="italic"))
+        label = tk.Label(self, text=text, font=tkfont.Font(family='Helvetica', size=18, weight="bold", slant="italic"))
         label.pack(side="top", fill="x", pady=10)
 
         ## required to make window show before the program gets to the mainloop
@@ -81,6 +81,9 @@ class ImageGUI(tk.Tk):
         
         # image info coords
         self.iicoords = (20,140)
+
+        # attribute to hold splash screen
+        self.splash = None
 
         self.title_font = tkfont.Font(family='Helvetica', size=18, weight="bold", slant="italic")
 
@@ -137,14 +140,20 @@ class ImageGUI(tk.Tk):
         except Exception as e:
             print(e)
 
+    def make_splash(self,text='Loading...'):
+        self.withdraw()
+        self.splash = LoadScreen(self,text=text)
+
+    def stop_splash(self):
+        self.splash.destroy()
+        self.deiconify()
+
 
     def start_img(self,img):
-        self.withdraw()
-        splash = LoadScreen(self)        
+        self.make_splash()       
         self.image_editor = ImageEditor(img,escale=self.escale)
         self.image_editor.image.load_image()
-        splash.destroy()
-        self.deiconify()
+        self.stop_splash()
         self.show_frame("ImageRotator")
 
 
@@ -210,18 +219,30 @@ class ImageSelector(tk.Frame):
         label = tk.Label(self, text="Select Image", font=controller.title_font)
         label.grid(row=0,column=1,columnspan=2,padx=(30,0),pady=(0,20))
         
-        petcol = 1
-        ctcol = 2
+        self.petcol = 1
+        self.ctcol = 2
 
         # pad space
         tk.Label(self,text=' '*25).grid(column=0)
 
         col_title_font = tkfont.Font(family='Helvetica', size=14)
-        tk.Label(self, text="PET Images", font=col_title_font).grid(row=1,column=petcol)
-        tk.Label(self, text="CT Images", font=col_title_font).grid(row=1,column=ctcol)
+        tk.Label(self, text="PET Images", font=col_title_font).grid(row=1,column=self.petcol)
+        tk.Label(self, text="CT Images", font=col_title_font).grid(row=1,column=self.ctcol)
+
+        self.make_buttons()
 
 
+
+    def re_init(self):
+        self.controller.nmice=None
+        for b in self.buttons:
+            b.destroy()
+        self.make_buttons()
+
+    def make_buttons(self):
         img_pairs = self.controller.get_files()
+
+        self.buttons = []
         for i,pair in enumerate(img_pairs):
             try:
                 im1,im2 = pair
@@ -229,33 +250,12 @@ class ImageSelector(tk.Frame):
                 im1,im2 = pair[0],None
             for im in [im1,im2]:
                 if im is not None:
-                    column = petcol if im.type == 'pet' else ctcol
-                    tk.Button(self,
+                    column = self.petcol if im.type == 'pet' else self.ctcol
+                    b = tk.Button(self,
                         text=im.filename,
-                        command = lambda im=im: controller.start_img(im)).grid(row=i+2,column=column)
-
-
-        # self.pet_buttons = []
-        # for i,pet in enumerate(self.pet_files):
-        #     self.pet_buttons.append(
-        #         tk.Button(self, 
-        #         text=pet.filename,
-        #         anchor='e',
-        #         command=lambda pet=pet: controller.start_img(pet)))
-        #     self.pet_buttons[-1].grid(row=i+1,column=1,padx=40)
-        # self.ct_buttons = []
-        # for i,ct in enumerate(self.ct_files):
-        #     self.ct_buttons.append(
-        #         tk.Button(self,
-        #             text=ct.filename,
-        #             anchor='w',
-        #             command=lambda ct=ct: controller.start_img(ct)
-        #             ))
-        #     self.ct_buttons[-1].grid(row=i+1,column=3)
-
-
-    def re_init(self):
-        self.controller.nmice=None
+                        command = lambda im=im: self.controller.start_img(im))
+                    b.grid(row=i+2,column=column)
+                    self.buttons.append(b)
 
 
 
@@ -485,7 +485,12 @@ class CutViewer(tk.Frame):
         self.animate_cuts()
 
     def save_cuts(self):
+        self.controller.make_splash(text='Saving images...')
         self.controller.image_editor.image.save_cuts(path=os.path.join('data','pcds','output'))
+        self.controller.stop_splash()
+        self.controller.image_editor.stop_animation()
+        self.controller.frames['ImageSelector'].re_init()
+        self.controller.show_frame('ImageSelector')
 
 if __name__ == "__main__":
     data_folder = os.path.join('data','pcds')

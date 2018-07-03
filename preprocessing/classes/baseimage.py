@@ -16,7 +16,7 @@ class BaseImage:
         self.img_data = img_data
         self.ax_map = {'z':0,'y':1,'x':2}
         self.struct_flags = {
-                                1:'b',
+                                1:'B',
                                 2:'h',
                                 3:'i',
                                 4:'f'
@@ -24,8 +24,14 @@ class BaseImage:
         self.frame_range = frame_range
         if filepath is not None:
             self.filename = ntpath.basename(filepath)
-            self.subject_id = self.filename.split('_')[0]
+            fpcs = self.filename.split('_')
+            if len(fpcs) >= 4:
+                self.subject_id = fpcs[0] + fpcs[3].split('.')[0]
+            else:
+                self.subject_id = fpcs[0]
         self.cuts = None
+        self.scale_factor = None
+        self.scaled = None
 
 
     def load_header(self):
@@ -204,21 +210,21 @@ class BaseImage:
             self.img_data = imgmat
             self.scaled = False
         else:
-            img_data = imgmat.reshape(nplanes,ps.x_dimension,ps.y_dimension,nframes)
+            imgmat = imgmat.reshape(nplanes,ps.x_dimension,ps.y_dimension,nframes)
             if multi_plane and (not multi_frame):
-                imagemat = img_data[0:nplanes,:,:,0]
-                imagemat1 = imagemat*ps.scale_factor[fr1]
+                imgmat = imgmat[0:nplanes,:,:,0]
+                self.scale_factor = ps.scale_factor[fr1]
             elif (not multi_plane) and multi_frame:
-                imagemat = img_data[0,:,:,0:nframes]
-                imagemat1 = imagemat*ps.scale_factor[fr1:fr2+1]
+                imgmat = imgmat[0,:,:,0:nframes]
+                self.scale_factor = ps.scale_factor[fr1:fr2+1]
             elif (not multi_plane) and (not multi_frame):
-                imagemat = img_data[0,:,:,0]
-                imagemat1 = imagemat*ps.scale_factor[fr1]
+                imgmat = imgmat[0,:,:,0]
+                self.scale_factor = ps.scale_factor[fr1]
             else: 
-                imagemat = img_data[0:nplanes,:,:,0:nframes]      
-                imagemat1 = imagemat*ps.scale_factor[fr1:fr2+1]
-                     
-            self.img_data = imagemat1.reshape(nplanes,ps.x_dimension,ps.y_dimension,nframes)
+                imgmat = imgmat[0:nplanes,:,:,0:nframes]      
+                self.scale_factor = ps.scale_factor[fr1:fr2+1]
+            imgmat = imgmat*self.scale_factor
+            self.img_data = imgmat.reshape(nplanes,ps.y_dimension,ps.x_dimension,nframes)
             self.scaled = True
 
         return
@@ -243,7 +249,7 @@ class BaseImage:
                         cut_hdr_lines[j] = ' '.join([dim,str(getattr(cut_img,dim))])
                         break
             fnpcs = self.filename.split('.')
-            fnpcs[0] = fnpcs[0] + '_{}'.format(i+1)
+            fnpcs[0] = fnpcs[0] + '_s{}'.format(i+1)
             cut_filename = '.'.join(fnpcs)
             cut_hdr_name = cut_filename+'.hdr'
             cut_hdr_str = '\n'.join(cut_hdr_lines)
@@ -251,11 +257,25 @@ class BaseImage:
             with open(os.path.join(path,cut_hdr_name),'w') as hf:
                 hf.write(cut_hdr_str)
 
-            out_data = cut_img.img_data.flatten()
+            out_data = cut_img.img_data
+            out_data = out_data.reshape(cut_img.xdim*cut_img.ydim*cut_img.zdim,cut_img.nframes)
+            if self.scaled:
+                inv = lambda x: 1/x
+                v_inv = np.vectorize(inv)
+                inv_scale_factor = v_inv(self.scale_factor)
+                out_data = out_data*inv_scale_factor
+
+            # prepare data to write out
+            out_data = out_data.swapaxes(0,1).flatten()
+            
+            # make sure data is int if it is supposed to be
+            if sf in ['i','B','h']:
+                out_data = out_data.astype(int)
+
             with open(os.path.join(path,cut_filename),'wb') as df:
                 for d in out_data:
                     df.write(struct.pack(sf,d))
-            print('Files saved.')
+            print('File saved.')
 
 
 
