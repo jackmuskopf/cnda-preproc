@@ -318,9 +318,9 @@ class ImageRotator(tk.Frame):
  
 
         rotbx,rotby = 200,220
-        tk.Button(self, text="rotate on x axis", command=lambda : self.rotate_on_axis('x')).place(x=rotbx,y=rotby)
-        tk.Button(self, text="rotate on y axis", command=lambda : self.rotate_on_axis('y')).place(x=rotbx,y=rotby+30)
-        tk.Button(self, text="rotate on z axis", command=lambda : self.rotate_on_axis('z')).place(x=rotbx,y=rotby+60)
+        tk.Button(self, text="Rotate on x axis", command=lambda : self.rotate_on_axis('x')).place(x=rotbx,y=rotby)
+        tk.Button(self, text="Rotate on y axis", command=lambda : self.rotate_on_axis('y')).place(x=rotbx,y=rotby+30)
+        tk.Button(self, text="Rotate on z axis", command=lambda : self.rotate_on_axis('z')).place(x=rotbx,y=rotby+60)
         
 
     def re_init(self):
