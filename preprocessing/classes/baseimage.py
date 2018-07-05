@@ -3,11 +3,12 @@ import sys
 import struct
 import numpy as np
 import ntpath
-from collections import namedtuple
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import warnings
 
+from collections import namedtuple
+from tempfile import mkdtemp
 
 class BaseImage:
 
@@ -90,6 +91,32 @@ class BaseImage:
         of the plane or frame to include; 
         - index from 0, e.g. for the first 40 planes, use [0,39]
         '''
+        def read_chunks(ifr):
+            '''
+            Trying to read data in chunks to handle HiResCt images
+            '''
+            imgmat
+            to_read = bpp*matsize
+            read_lim = 10**8
+            print('Will read {} 100MB chunks.'.format(to_read/read_lim))
+            ix = 0
+            while to_read > read_lim:
+                print('Reading new chunk; {}MB left'.format(int(to_read/10**6)))
+                nbytes = read_lim
+                npixels = int(nbytes/bpp)
+                chunk = np.array(struct.unpack(sf*npixels,img_file.read(nbytes)))
+                imgmat[ifr][ix:ix+npixels] = chunk
+                to_read -= read_lim
+                ix+=npixels
+
+            print('Reading new chunk; {}MB left'.format(int(to_read/10**6)))
+            nbytes = to_read
+            npixels = int(nbytes/bpp)
+            chunk = np.array(struct.unpack(sf*npixels,img_file.read(nbytes)))
+            imgmat[ifr][ix:ix+npixels] = chunk
+
+
+
         x,y,z,fs = self.params.x_dimension,self.params.y_dimension,self.params.z_dimension,self.params.total_frames
         print('File dimensions: ({},{},{},{})'.format(x,y,z,fs))
         ps = self.params
@@ -193,17 +220,27 @@ class BaseImage:
         # read data from file
         print('Reading image data...')
         img_file = open(self.filepath,'rb')
+        print('Image is open.')
         matsize = ps.x_dimension*ps.y_dimension*nplanes
         pl_offset = pl[0]*(ps.x_dimension*ps.y_dimension)
-        imgmat = []
+
+        # make tempfile for whole image
+        img_temp_name = os.path.join(mkdtemp(),'preproc_imgtemp.dat')
+        imgmat = np.memmap(img_temp_name,mode='w+',dtype='float32',shape=(nframes,matsize))
+        # imgmat = []
+        
         for ifr in frames:  
             fr_offset = ifr*(ps.x_dimension*ps.y_dimension*ps.z_dimension)
             img_file.seek(bpp*(fr_offset+pl_offset))
-            frame_data = np.array(struct.unpack(sf*matsize,img_file.read(bpp*matsize)))
-            imgmat.append(frame_data)
-        imgmat = np.array(imgmat)
+            read_chunks(ifr)
+            # print(bpp*matsize)
+            # frame_data = struct.unpack(sf*matsize,img_file.read(bpp*matsize))
+            # imgmat.append(frame_data)
+        # imgmat = np.array(imgmat)
         imgmat = imgmat.swapaxes(0,1)
         img_file.close()
+
+        print('Image read into memory.')
         
         # scale data
         if unscaled:
@@ -272,9 +309,11 @@ class BaseImage:
             if sf in ['i','B','h']:
                 out_data = out_data.astype(int)
 
+            out_data = list(out_data)
+
+            nd = len(out_data)
             with open(os.path.join(path,cut_filename),'wb') as df:
-                for d in out_data:
-                    df.write(struct.pack(sf,d))
+                df.write(struct.pack(nd*sf,*out_data))
             print('File saved.')
 
 

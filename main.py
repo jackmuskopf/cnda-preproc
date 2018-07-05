@@ -259,14 +259,15 @@ class ImageSelector(tk.Frame):
     def browse_file(self):
         Tk().withdraw()
         fpath = askopenfilename()
-        if fpath.endswith('.hdr'):
-            fpath = '.'.join(fpath.split('.')[:-1])
-        fname = ntpath.basename(fpath)
-        if is_pet(fname):
-            img = PETImage(fpath)
-        else:
-            img = CTImage(fpath)
-        self.controller.start_img(img)
+        if fpath:
+            if fpath.endswith('.hdr'):
+                fpath = '.'.join(fpath.split('.')[:-1])
+            fname = ntpath.basename(fpath)
+            if is_pet(fname):
+                img = PETImage(fpath)
+            else:
+                img = CTImage(fpath)
+            self.controller.start_img(img)
 
 
 
@@ -515,15 +516,13 @@ class CutViewer(tk.Frame):
     def save_cuts(self):
         Tk().withdraw()
         save_path = askdirectory()
-        if not save_path:
-            save_path = os.path.join('data','pcds','output')
-            print('Saving to default folder: \n{}'.format(save_path))
-        self.controller.make_splash(text='Saving images...')
-        self.controller.image_editor.image.save_cuts(path=save_path)
-        self.controller.stop_splash()
-        self.controller.image_editor.stop_animation()
-        self.controller.frames['ImageSelector'].re_init()
-        self.controller.show_frame('ImageSelector')
+        if save_path:
+            self.controller.make_splash(text='Saving images...')
+            self.controller.image_editor.image.save_cuts(path=save_path)
+            self.controller.stop_splash()
+            self.controller.image_editor.stop_animation()
+            self.controller.frames['ImageSelector'].re_init()
+            self.controller.show_frame('ImageSelector')
 
 
 def is_pet(fname):
