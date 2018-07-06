@@ -6,9 +6,11 @@ import ntpath
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import warnings
+import tempfile
+import shutil
 
 from collections import namedtuple
-from tempfile import mkdtemp
+
 
 class BaseImage:
 
@@ -33,6 +35,25 @@ class BaseImage:
         self.cuts = None
         self.scale_factor = None
         self.scaled = None
+        self.tempdir = None
+
+    def rmtempdir(self):
+        try:
+            shutil.rmtree(self.tempdir)
+            print('Removed tempdir: {}'.format(self.tempdir))
+        except Exception as e:
+            print('Failed to remove tempdir: {0}\n{1}'.format(self.tempdir,e))
+
+    def sub_memmap(self, ix, data):
+        if self.tempdir is None:
+            raise ValueError('self.tempdir is None in self.sub_memmap.')
+        fnpcs = self.filename.split('.')
+        fnpcs[0] = fnpcs[0] + '_s{}'.format(ix)
+        filename = '.'.join(fnpcs)
+        img_temp_name = os.path.join(self.tempdir,'{}.dat'.format(filename.split('.')[0]))
+        dfile = np.memmap(img_temp_name, mode='w+', dtype='float32', shape=data.shape)
+        dfile[:] = data[:]
+        return filename, dfile
 
 
     def load_header(self):
@@ -225,18 +246,13 @@ class BaseImage:
         pl_offset = pl[0]*(ps.x_dimension*ps.y_dimension)
 
         # make tempfile for whole image
-        img_temp_name = os.path.join(mkdtemp(),'preproc_imgtemp.dat')
+        img_temp_name = os.path.join(self.tempdir,'{}.dat'.format(self.filename.split('.')[0]))
         imgmat = np.memmap(img_temp_name,mode='w+',dtype='float32',shape=(nframes,matsize))
-        # imgmat = []
         
         for ifr in frames:  
             fr_offset = ifr*(ps.x_dimension*ps.y_dimension*ps.z_dimension)
             img_file.seek(bpp*(fr_offset+pl_offset))
             read_chunks(ifr)
-            # print(bpp*matsize)
-            # frame_data = struct.unpack(sf*matsize,img_file.read(bpp*matsize))
-            # imgmat.append(frame_data)
-        # imgmat = np.array(imgmat)
         imgmat = imgmat.swapaxes(0,1)
         img_file.close()
 
@@ -285,9 +301,7 @@ class BaseImage:
                     if line.strip().startswith(dim):
                         cut_hdr_lines[j] = ' '.join([dim,str(getattr(cut_img,dim))])
                         break
-            fnpcs = self.filename.split('.')
-            fnpcs[0] = fnpcs[0] + '_s{}'.format(i+1)
-            cut_filename = '.'.join(fnpcs)
+            cut_filename = cut_img.filename
             cut_hdr_name = cut_filename+'.hdr'
             cut_hdr_str = '\n'.join(cut_hdr_lines)
 
@@ -384,9 +398,12 @@ class BaseImage:
 
 class SubImage(BaseImage):
 
-    def __init__(self, parent_image, img_data, filepath=None):
+    def __init__(self, parent_image, img_data, filename):
 
-        BaseImage.__init__(self, filepath=filepath, img_data=img_data)
+        # make tempfile
+        self.filename = filename
+
+        BaseImage.__init__(self, filepath='./{}'.format(self.filename), img_data=img_data)
         self.type = parent_image.type
         self.parent_image = parent_image
         self.frame_range = parent_image.frame_range
@@ -446,6 +463,8 @@ class PETImage(BaseImage):
                     2 : (self.zdim, self.ydim)}
         self.scaled = None
 
+        self.tempdir = tempfile.mkdtemp()
+
 
 
 
@@ -485,3 +504,5 @@ class CTImage(BaseImage):
         self.scaled = None
 
         self.cuts = None
+
+        self.tempdir = tempfile.mkdtemp()

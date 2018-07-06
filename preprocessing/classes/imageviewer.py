@@ -373,81 +373,90 @@ class ImageEditor(ImageViewer):
 	def cut_image(self):
 
 		cx,cy = self.cx,self.cy
+		img_data = self.image.img_data
 
 		# cut in half in y,z plane
 		if self.cutter == 'vertical':
-			img_data = self.image.img_data
-			left_half = img_data[:,:,:cx,:]
-			right_half = img_data[:,:,cx:,:]
 
-			left_im = SubImage(parent_image=self.image, img_data=left_half)
-			right_im = SubImage(parent_image=self.image, img_data=right_half)
+			# left half
+			lhfn, lhd = self.image.submemmap(ix=1, data=img_data[:,:,:cx,:])
+			left_im = SubImage(parent_image=self.image, img_data=lhd, filename=lhfn)
+			
+			# right half
+			rhfn, rhd = self.image.submemmap(ix=2, data=img_data[:,:,cx:,:])
+			right_im = SubImage(parent_image=self.image, img_data=rhd, filename=rhfn)
 			
 			self.image.cuts = [left_im, right_im]
 			return self.image.cuts
 
 		elif self.cutter == 'horizontal':
-			img_data = self.image.img_data
-			top_half = img_data[:,cy:,:,:]
-			bottom_half = img_data[:,:cy,:,:]
 
-			top_im = SubImage(parent_image=self.image, img_data=top_half)
-			bottom_im = SubImage(parent_image=self.image, img_data=bottom_half)
+			# top half
+			thfn, thd = self.image.submemmap(ix=1, data=img_data[:,cy:,:,:])
+			top_im = SubImage(parent_image=self.image, img_data=thd, filename=thfn)
+
+			# bottom half
+			bhfn, bhd = self.image.submemmap(ix=2, data=img_data[:,:cy,:,:])
+			bottom_im = SubImage(parent_image=self.image, img_data=bhd, filename=bhfn)
 			
 			self.image.cuts = [top_im, bottom_im]
 			return self.image.cuts
 
 		elif self.cutter == 'down_T':
-			img_data = self.image.img_data
-			top_half = img_data[:,cy:,:,:]
-			bottom_half = img_data[:,:cy,:,:]
 
-			bottom_left = bottom_half[:,:,:cx,:]
-			bottom_right = bottom_half[:,:,cx:,:]
+			# top half
+			thfn, thd = self.image.submemmap(ix=1, data=img_data[:,cy:,:,:])
+			top_im = SubImage(parent_image=self.image, img_data=thd, filename=thfn)
 
-			top_im = SubImage(parent_image=self.image, img_data=top_half)
-			bl = SubImage(parent_image=self.image, img_data=bottom_left)
-			br = SubImage(parent_image=self.image, img_data=bottom_right)
+			# bottom left
+			blfn, bld = self.image.submemmap(ix=2, data=img_data[:,:cy,:cx,:])
+			bl = SubImage(parent_image=self.image, img_data=bld, filename=blfn)
+
+			# bottom right
+			brfn, brd = self.image.submemmap(ix=3, data=img_data[:,:cy,cx:,:])
+			br = SubImage(parent_image=self.image, img_data=brd,  filename=brfn)
 			
 			self.image.cuts = [top_im, bl, br]
 			return self.image.cuts
 
 
 		elif self.cutter == 'up_T':
-			img_data = self.image.img_data
-			top_half = img_data[:,cy:,:,:]
-			bottom_half = img_data[:,:cy,:,:]
 
-			top_left = top_half[:,:,:cx,:]
-			top_right = top_half[:,:,cx:,:]
+			# top left
+			tlfn, tld = self.image.submemmap(ix=1, data=img_data[:,cy:,:cx,:])
+			tl = SubImage(parent_image=self.image, img_data=tld, filename=tlfn)
 
-			tl = SubImage(parent_image=self.image, img_data=top_left)
-			tr = SubImage(parent_image=self.image, img_data=top_right)
-			bottom_im = SubImage(parent_image=self.image, img_data=bottom_half)
+
+			# top right
+			trfn, trd = self.image.submemmap(ix=2, data=img_data[:,cy:,cx:,:])
+			tr = SubImage(parent_image=self.image, img_data=trd, filename=trfn)
+
+			# bottom half
+			bhfn, bhd = self.image.submemmap(ix=3, data=img_data[:,:cy,:,:])
+			bottom_im = SubImage(parent_image=self.image, img_data=bhd, filename=bhfn)
 
 			self.image.cuts = [tl, tr, bottom_im]
 			return self.image.cuts
 
 		# cut in quadrants in y,z and x,z planes
 		elif self.cutter == 'cross':
-			img_data = self.image.img_data
+
+			# top left
+			tlfn, tld = self.image.submemmap(ix=1, data=img_data[:,cy:,:cx,:])
+			tl = SubImage(parent_image=self.image, img_data=tld, filename=tlfn)
+
+			# top right
+			trfn, trd = self.image.submemmap(ix=2, data=img_data[:,cy:,cx:,:])
+			tr = SubImage(parent_image=self.image, img_data=trd, filename=trfn)
 			
-			# cut in half in y,z
-			left_half = img_data[:,:,:cx,:]
-			right_half = img_data[:,:,cx:,:]
+			# bottom left
+			blfn, bld = self.image.submemmap(ix=3, data=img_data[:,:cy,:cx,:])
+			bl = SubImage(parent_image=self.image, img_data=bld, filename=blfn)
 
-			# in half again, in x,z
-			bottom_left = left_half[:,:cy,:,:]
-			top_left = left_half[:,cy:,:,:]
+			# bottom right
+			brfn, brd = self.image.submemmap(ix=4, data=img_data[:,:cy,cx:,:])
+			br = SubImage(parent_image=self.image, img_data=brd,  filename=brfn)
 
-			bottom_right = right_half[:,:cy,:,:]
-			top_right = right_half[:,cy:,:,:]
-
-
-			tl = SubImage(parent_image=self.image, img_data=top_left)
-			tr = SubImage(parent_image=self.image, img_data=top_right)
-			bl = SubImage(parent_image=self.image, img_data=bottom_left)
-			br = SubImage(parent_image=self.image, img_data=bottom_right)
 
 			self.image.cuts = [tl,tr,bl,br]
 

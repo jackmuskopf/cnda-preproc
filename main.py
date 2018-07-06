@@ -521,6 +521,7 @@ class CutViewer(tk.Frame):
             self.controller.image_editor.image.save_cuts(path=save_path)
             self.controller.stop_splash()
             self.controller.image_editor.stop_animation()
+            self.controller.image_editor.image.rmtempdir()
             self.controller.frames['ImageSelector'].re_init()
             self.controller.show_frame('ImageSelector')
 
