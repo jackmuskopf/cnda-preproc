@@ -4,6 +4,7 @@ if sys.platform == 'darwin':
     matplotlib.use('TkAgg')
 import ntpath
 import atexit
+import gc
 import tkinter as tk
 from tkinter import Tk
 from collections import defaultdict                
@@ -11,7 +12,6 @@ from tkinter import font  as tkfont
 from tkinter.filedialog import askopenfilename, askdirectory
 from preprocessing.classes.baseimage import *
 from preprocessing.classes.imageviewer import *
-from preprocessing.settings import *
 
 
 
@@ -55,9 +55,6 @@ class ImageGUI(tk.Tk):
         ws = self.winfo_screenwidth() # width of the screen
         hs = self.winfo_screenheight() # height of the screen
 
-        # remove any existing logged tempdirs
-        self.remove_temp_dirs()
-
         # calculate x and y coordinates for the Tk root window
         x = (ws/2) - (w/2)
         y = (hs/2) - (h/2)
@@ -71,6 +68,7 @@ class ImageGUI(tk.Tk):
         self.image_editor = None
         self.nmice = None
         self.folder = folder.strip('/').strip('\\').strip()
+        self.tempdirs = []
 
         # default exposure scale
         self.escale = 14.0
@@ -150,11 +148,9 @@ class ImageGUI(tk.Tk):
         self.make_splash()       
         self.image_editor = ImageEditor(img,escale=self.escale)
         self.image_editor.image.load_image()
+        self.tempdirs.append(self.image_editor.image.tempdir)
         self.stop_splash()
         self.show_frame("ImageRotator")
-
-
-
 
     def init_escaler(self, frame):
         self.adjust_escale(frame)
@@ -207,21 +203,30 @@ class ImageGUI(tk.Tk):
         frame.img_info.place(x=coords[0],y=coords[1])
 
     def remove_temp_dirs(self):
-        with open(TEMPLOG,"r") as log:
-            tempdirs = [d for d in log.read().split('\n') if d]
-
-        deleted = []
-        for directory in tempdirs:
+        self.clean_memmaps()
+        for directory in self.tempdirs:
             try:
                 shutil.rmtree(directory)
                 print('Removed tempdir: {}'.format(directory))
-                deleted.append(directory)
+                self.tempdirs.remove(directory)
             except Exception as e:
                 print('Failed to remove tempdir: {0}\n{1}'.format(directory,e))
         
-        if len(deleted) == len(tempdirs):
-            with open(TEMPLOG, "w") as log:
-                log.write('')
+    def clean_memmaps(self):
+        if self.image_editor is not None:
+            if self.image_editor.image is not None:
+                if self.image_editor.image.cuts is not None:
+                    for cut in self.image_editor.image.cuts:
+                        delattr(cut,'img_data')
+                        fn = '{}.dat'.format(cut.filename.split('.')[0])
+                        fp = os.path.join(self.image_editor.image.tempdir,fn)
+                        os.remove(fp)
+                delattr(self.image_editor.image,'img_data')
+                fn = '{}.dat'.format(self.image_editor.image.filename.split('.')[0])
+                fp = os.path.join(self.image_editor.image.tempdir,fn)
+                os.remove(fp)
+        self.image_editor = None
+        gc.collect()
 
 
 class ImageSelector(tk.Frame):
@@ -244,14 +249,15 @@ class ImageSelector(tk.Frame):
         tk.Label(self, text="CT Images", font=col_title_font).grid(row=2,column=self.ctcol)
 
         # browse for file
-        tk.Button(self, text='Browse', command=self.browse_file).grid(row=1,column=1,columnspan=2,padx=(30,0),pady=(0,20))
-        tk.Button(self, text='Quit', command=quit_app).grid(row=1,column=2,columnspan=2,padx=(30,0),pady=(0,20))
+        tk.Button(self, text='Browse', command=self.browse_file).grid(row=1,column=1,columnspan=1,padx=(30,0),pady=(0,20))
+        tk.Button(self, text='Quit', command=quit_app).grid(row=1,column=2,columnspan=1,padx=(30,0),pady=(0,20))
 
         self.make_buttons()
 
 
 
     def re_init(self):
+        self.controller.remove_temp_dirs() # do this when we select new file
         self.controller.nmice=None
         for b in self.buttons:
             b.destroy()
@@ -540,6 +546,7 @@ class CutViewer(tk.Frame):
             self.controller.image_editor.image.save_cuts(path=save_path)
             self.controller.stop_splash()
             self.controller.image_editor.stop_animation()
+            self.controller.remove_temp_dirs()
             self.controller.frames['ImageSelector'].re_init()
             self.controller.show_frame('ImageSelector')
 

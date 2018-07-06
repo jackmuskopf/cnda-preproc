@@ -11,8 +11,6 @@ import shutil
 
 from collections import namedtuple
 
-TEMPLOG = os.path.join(os.getcwd(),'preprocessing','temp_dirs.txt')
-
 class BaseImage:
 
     def __init__(self, filepath=None, img_data=None, frame_range=None):
@@ -50,12 +48,6 @@ class BaseImage:
         dfile = np.memmap(img_temp_name, mode='w+', dtype='float32', shape=data.shape)
         dfile[:] = data[:]
         return filename, dfile
-
-    def record_tempdir(self):
-        if self.tempdir is None:
-            raise ValueError('self.tempdir is None in self.record_tempdir')
-        with open(TEMPLOG, "a") as log:
-            log.write('{}\n'.format(self.tempdir))
 
 
 
@@ -244,10 +236,9 @@ class BaseImage:
         # read data from file
         self.tempdir = tempfile.mkdtemp()
         print('Making tempdir: {}'.format(self.tempdir))
-        self.record_tempdir()
         print('Reading image data...')
+        
         img_file = open(self.filepath,'rb')
-        print('Image is open.')
         matsize = ps.x_dimension*ps.y_dimension*nplanes
         pl_offset = pl[0]*(ps.x_dimension*ps.y_dimension)
 
@@ -262,8 +253,6 @@ class BaseImage:
         imgmat = imgmat.swapaxes(0,1)
         img_file.close()
 
-        print('Image read into memory.')
-        
         # scale data
         if unscaled:
             self.img_data = imgmat

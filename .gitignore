@@ -7,6 +7,10 @@ __pycache__/
 # ignore all data
 data/
 output/
+build/
+dist/
+*.spec
 
 # ignore all ipynb_checkpoints
 .ipynb_checkpoints/
+
