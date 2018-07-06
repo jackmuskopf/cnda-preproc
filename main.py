@@ -3,6 +3,7 @@ if sys.platform == 'darwin':
     import matplotlib
     matplotlib.use('TkAgg')
 import ntpath
+import atexit
 import tkinter as tk
 from tkinter import Tk
 from collections import defaultdict                
@@ -11,9 +12,6 @@ from tkinter.filedialog import askopenfilename, askdirectory
 from preprocessing.classes.baseimage import *
 from preprocessing.classes.imageviewer import *
 from preprocessing.settings import *
-
-
-
 
 
 
@@ -56,6 +54,9 @@ class ImageGUI(tk.Tk):
         # get screen width and height
         ws = self.winfo_screenwidth() # width of the screen
         hs = self.winfo_screenheight() # height of the screen
+
+        # remove any existing logged tempdirs
+        self.remove_temp_dirs()
 
         # calculate x and y coordinates for the Tk root window
         x = (ws/2) - (w/2)
@@ -205,6 +206,22 @@ class ImageGUI(tk.Tk):
         coords = self.iicoords
         frame.img_info.place(x=coords[0],y=coords[1])
 
+    def remove_temp_dirs(self):
+        with open(TEMPLOG,"r") as log:
+            tempdirs = [d for d in log.read().split('\n') if d]
+
+        deleted = []
+        for directory in tempdirs:
+            try:
+                shutil.rmtree(directory)
+                print('Removed tempdir: {}'.format(directory))
+                deleted.append(directory)
+            except Exception as e:
+                print('Failed to remove tempdir: {0}\n{1}'.format(directory,e))
+        
+        if len(deleted) == len(tempdirs):
+            with open(TEMPLOG, "w") as log:
+                log.write('')
 
 
 class ImageSelector(tk.Frame):
@@ -212,6 +229,7 @@ class ImageSelector(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.controller = controller
+        self.controller.remove_temp_dirs()
         label = tk.Label(self, text="Select Image", font=controller.title_font)
         label.grid(row=0,column=1,columnspan=2,padx=(30,0),pady=(0,20))
         
@@ -226,7 +244,8 @@ class ImageSelector(tk.Frame):
         tk.Label(self, text="CT Images", font=col_title_font).grid(row=2,column=self.ctcol)
 
         # browse for file
-        tk.Button(self,text='Browse', command = self.browse_file).grid(row=1,column=1,columnspan=2,padx=(30,0),pady=(0,20))
+        tk.Button(self, text='Browse', command=self.browse_file).grid(row=1,column=1,columnspan=2,padx=(30,0),pady=(0,20))
+        tk.Button(self, text='Quit', command=quit_app).grid(row=1,column=2,columnspan=2,padx=(30,0),pady=(0,20))
 
         self.make_buttons()
 
@@ -521,7 +540,6 @@ class CutViewer(tk.Frame):
             self.controller.image_editor.image.save_cuts(path=save_path)
             self.controller.stop_splash()
             self.controller.image_editor.stop_animation()
-            self.controller.image_editor.image.rmtempdir()
             self.controller.frames['ImageSelector'].re_init()
             self.controller.show_frame('ImageSelector')
 
@@ -532,9 +550,13 @@ def is_pet(fname):
     else:
         return False
 
+def quit_app():
+    app.remove_temp_dirs()
+    app.destroy()
 
 
 if __name__ == "__main__":
     data_folder = os.path.join('data','pcds')
     app = ImageGUI(folder=data_folder)
+    atexit.register(app.remove_temp_dirs)
     app.mainloop()

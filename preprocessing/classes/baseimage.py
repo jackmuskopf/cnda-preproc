@@ -11,6 +11,7 @@ import shutil
 
 from collections import namedtuple
 
+TEMPLOG = os.path.join(os.getcwd(),'preprocessing','temp_dirs.txt')
 
 class BaseImage:
 
@@ -35,16 +36,11 @@ class BaseImage:
         self.cuts = None
         self.scale_factor = None
         self.scaled = None
+        self.bpp = None # bytes per pixel
         self.tempdir = None
 
-    def rmtempdir(self):
-        try:
-            shutil.rmtree(self.tempdir)
-            print('Removed tempdir: {}'.format(self.tempdir))
-        except Exception as e:
-            print('Failed to remove tempdir: {0}\n{1}'.format(self.tempdir,e))
 
-    def sub_memmap(self, ix, data):
+    def submemmap(self, ix, data):
         if self.tempdir is None:
             raise ValueError('self.tempdir is None in self.sub_memmap.')
         fnpcs = self.filename.split('.')
@@ -54,6 +50,13 @@ class BaseImage:
         dfile = np.memmap(img_temp_name, mode='w+', dtype='float32', shape=data.shape)
         dfile[:] = data[:]
         return filename, dfile
+
+    def record_tempdir(self):
+        if self.tempdir is None:
+            raise ValueError('self.tempdir is None in self.record_tempdir')
+        with open(TEMPLOG, "a") as log:
+            log.write('{}\n'.format(self.tempdir))
+
 
 
     def load_header(self):
@@ -116,7 +119,6 @@ class BaseImage:
             '''
             Trying to read data in chunks to handle HiResCt images
             '''
-            imgmat
             to_read = bpp*matsize
             read_lim = 10**8
             print('Will read {} 100MB chunks.'.format(to_read/read_lim))
@@ -236,9 +238,13 @@ class BaseImage:
         }
 
         bpp = bytes_per_pixel[ps.data_type]
+        self.bpp = bpp
         sf = self.struct_flags[ps.data_type]
 
         # read data from file
+        self.tempdir = tempfile.mkdtemp()
+        print('Making tempdir: {}'.format(self.tempdir))
+        self.record_tempdir()
         print('Reading image data...')
         img_file = open(self.filepath,'rb')
         print('Image is open.')
@@ -284,6 +290,40 @@ class BaseImage:
 
 
     def save_cuts(self,path):
+
+
+        def write_chunks(data, dfile):
+            '''
+            Trying to read data in chunks to handle HiResCt images
+            '''
+            if self.bpp is None:
+                raise ValueError('self.bpp not defined in self.save_cuts')
+            bpp = self.bpp
+
+            total_pixels = len(data)
+            bytes_to_write = total_pixels*bpp
+            write_lim = 10**8
+
+            print('Will write {} 100MB chunks.'.format(bytes_to_write/write_lim))
+            ix = 0
+            while bytes_to_write > write_lim:
+                print('Writing new chunk; {}MB left'.format(int(bytes_to_write/10**6)))
+                nbytes = write_lim
+                npixels = int(nbytes/bpp)
+                chunk = data[ix:ix+npixels]
+                dfile.write(struct.pack(npixels*sf, *chunk))
+                bytes_to_write -= write_lim
+                ix += npixels
+
+            print('Writing new chunk; {}MB left'.format(int(bytes_to_write/10**6)))
+            nbytes = bytes_to_write
+            npixels = int(nbytes/bpp)
+            chunk = data[ix:ix+npixels]
+            dfile.write(struct.pack(npixels*sf, *chunk))
+            return
+
+
+
         print('Saving files...')
         if self.cuts is None:
             raise ValueError('Image has not been cut in BaseImage.save_cuts()')
@@ -309,7 +349,8 @@ class BaseImage:
                 hf.write(cut_hdr_str)
 
             out_data = cut_img.img_data
-            out_data = out_data.reshape(cut_img.xdim*cut_img.ydim*cut_img.zdim,cut_img.nframes)
+            # out_data = out_data.reshape(cut_img.xdim*cut_img.ydim*cut_img.zdim,cut_img.nframes)
+            out_data.resize(cut_img.xdim*cut_img.ydim*cut_img.zdim,cut_img.nframes)
             if self.scaled:
                 inv = lambda x: 1/x
                 v_inv = np.vectorize(inv)
@@ -323,11 +364,9 @@ class BaseImage:
             if sf in ['i','B','h']:
                 out_data = out_data.astype(int)
 
-            out_data = list(out_data)
-
-            nd = len(out_data)
-            with open(os.path.join(path,cut_filename),'wb') as df:
-                df.write(struct.pack(nd*sf,*out_data))
+            with open(os.path.join(path,cut_filename),'wb') as dfile:
+                write_chunks(out_data,dfile)
+                # dfile.write(struct.pack(nd*sf,*out_data))
             print('File saved.')
 
 
@@ -463,7 +502,7 @@ class PETImage(BaseImage):
                     2 : (self.zdim, self.ydim)}
         self.scaled = None
 
-        self.tempdir = tempfile.mkdtemp()
+        
 
 
 
@@ -505,4 +544,3 @@ class CTImage(BaseImage):
 
         self.cuts = None
 
-        self.tempdir = tempfile.mkdtemp()
