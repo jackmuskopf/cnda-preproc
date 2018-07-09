@@ -511,11 +511,11 @@ class CutViewer(tk.Frame):
         tk.Button(self, text="Back",command=self.back).place(x=nbbx,y=nbby)
         tk.Button(self, text="Save",command=self.save_cuts).place(x=nbbx+180,y=nbby)
 
-        # view axes
-        vbx, vby = 200,220
-        tk.Button(self,text="View collapsed x-axis",command=lambda:self.change_ax('x')).place(x=vbx,y=vby)
-        tk.Button(self,text="View collapsed y-axis",command=lambda:self.change_ax('y')).place(x=vbx,y=vby+30)
-        tk.Button(self,text="View collapsed z-axis",command=lambda:self.change_ax('z')).place(x=vbx,y=vby+60)
+        # # view axes
+        # vbx, vby = 200,220
+        # tk.Button(self,text="View collapsed x-axis",command=lambda:self.change_ax('x')).place(x=vbx,y=vby)
+        # tk.Button(self,text="View collapsed y-axis",command=lambda:self.change_ax('y')).place(x=vbx,y=vby+30)
+        # tk.Button(self,text="View collapsed z-axis",command=lambda:self.change_ax('z')).place(x=vbx,y=vby+60)
         
         # exposure scale
         self.escale_label = None
