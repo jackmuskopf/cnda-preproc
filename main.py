@@ -101,7 +101,7 @@ class ImageGUI(tk.Tk):
         container.grid_columnconfigure(0, weight=1)
 
         self.frames = {}
-        for F in (ImageSelector, ImageRotator, ImageCutter, CutViewer):
+        for F in (ImageSelector, ImageRotator, ImageCutter, CutViewer, HeaderUI):
             page_name = F.__name__
             frame = F(parent=container, controller=self)
             self.frames[page_name] = frame
@@ -136,7 +136,7 @@ class ImageGUI(tk.Tk):
 
         try:
             frame.re_init()
-        except Exception as e:
+        except AttributeError as e:
             print(e)
 
     def make_splash(self,text='Loading...'):
@@ -452,10 +452,10 @@ class ImageCutter(tk.Frame):
         tk.Button(self, text="Back",command=self.back).place(x=nbbx,y=nbby)
         tk.Button(self,text="Cut Image",command=self.do_cut).place(x=nbbx+180,y=nbby)
 
-        # view axes
-        vbx, vby = 200,220
-        viewy = tk.Button(self,text="View collapsed y-axis",command=lambda:self.change_ax('y')).place(x=vbx,y=vby)
-        viewz = tk.Button(self,text="View collapsed z-axis",command=lambda:self.change_ax('z')).place(x=vbx,y=vby+30)
+        # # view axes
+        # vbx, vby = 200,220
+        # viewy = tk.Button(self,text="View collapsed y-axis",command=lambda:self.change_ax('y')).place(x=vbx,y=vby)
+        # viewz = tk.Button(self,text="View collapsed z-axis",command=lambda:self.change_ax('z')).place(x=vbx,y=vby+30)
         
     def recenter(self):
         self.controller.image_editor.cx, self.controller.image_editor.cy = self.controller.image_editor.cx_def, self.controller.image_editor.cy_def
@@ -511,11 +511,11 @@ class CutViewer(tk.Frame):
         tk.Button(self, text="Back",command=self.back).place(x=nbbx,y=nbby)
         tk.Button(self, text="Save",command=self.save_cuts).place(x=nbbx+180,y=nbby)
 
-        # # view axes
-        # vbx, vby = 200,220
-        # tk.Button(self,text="View collapsed x-axis",command=lambda:self.change_ax('x')).place(x=vbx,y=vby)
-        # tk.Button(self,text="View collapsed y-axis",command=lambda:self.change_ax('y')).place(x=vbx,y=vby+30)
-        # tk.Button(self,text="View collapsed z-axis",command=lambda:self.change_ax('z')).place(x=vbx,y=vby+60)
+        # view axes
+        vbx, vby = 200,220
+        tk.Button(self,text="View collapsed x-axis",command=lambda:self.change_ax('x')).place(x=vbx,y=vby)
+        tk.Button(self,text="View collapsed y-axis",command=lambda:self.change_ax('y')).place(x=vbx,y=vby+30)
+        tk.Button(self,text="View collapsed z-axis",command=lambda:self.change_ax('z')).place(x=vbx,y=vby+60)
         
         # exposure scale
         self.escale_label = None
@@ -564,6 +564,82 @@ class CutViewer(tk.Frame):
             self.controller.show_frame('ImageSelector')
 
 
+class HeaderUI(tk.Frame):
+
+    def __init__(self, parent, controller):
+
+        ### TODO ###
+        # layout entry labels and boxes, corresponding to obj attr
+        # init obj attr
+        # iterate cuts, as started in re_init()
+        
+        
+        tk.Frame.__init__(self, parent)
+        self.controller = controller
+        self.img_info = None
+        
+        # title
+        label = tk.Label(self, text="Header Information", font=controller.title_font)
+        label.grid(row=0,column=1,columnspan=2,padx=(30,0),pady=(0,20))
+
+        # back, next
+        nbbr,nbbc = 0,0
+        tk.Button(self, text="Back",command=self.back).grid(column=nbbc,row=nbbr)
+        tk.Button(self, text="Save",command=self.save_cuts).grid(column=nbbc=1,row=nbbr)
+
+
+        # exposure scale
+        self.escale_label = None
+        self.escale_apply = None
+        self.escaler = None
+        self.controller.init_escaler(self)
+        
+
+    def re_init(self, cutn=0):
+        if cutn > len(self.image_editor.image.cuts):
+            self.ask_save()
+        self.controller.init_img_info(self)
+        self.controller.init_escaler(self)
+        self.init_ani()
+
+    def init_ani(self):
+        self.animate_cuts()
+
+    def back(self):
+        self.controller.image_editor.stop_animation()
+        if self.controller.image_editor.nmice == 1:
+            self.controller.show_frame('ImageRotator')
+        else:
+            self.controller.show_frame('ImageCutter')
+
+    def animate_cuts(self):
+        self.controller.image_editor.stop_animation()
+        if self.controller.image_editor.nmice == 1:
+            self.controller.image_editor.animate_collapse(self.controller.view_ax)
+        else:
+            self.controller.image_editor.animate_cuts(self.controller.view_ax)
+
+    def change_ax(self,ax):
+        self.controller.view_ax = ax
+        self.animate_cuts()
+
+
+    def save_cuts(self):
+        Tk().withdraw()
+        save_path = askdirectory()
+        if save_path:
+            self.controller.make_splash(text='Saving images...')
+            self.controller.image_editor.image.save_cuts(path=save_path)
+            self.controller.stop_splash()
+            self.controller.image_editor.stop_animation()
+            self.controller.remove_temp_dirs()
+            self.controller.frames['ImageSelector'].re_init()
+            self.controller.show_frame('ImageSelector')
+
+
+
+
+# functions
 def is_pet(fname):
     if 'pet' in fname and '.ct' not in fname and fname.endswith('.img'):
         return True
