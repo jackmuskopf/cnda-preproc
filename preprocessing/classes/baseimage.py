@@ -6,8 +6,6 @@ import ntpath
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import warnings
-import tempfile
-import shutil
 
 from collections import namedtuple
 
@@ -36,6 +34,7 @@ class BaseImage:
         self.scaled = None
         self.bpp = None # bytes per pixel
         self.tempdir = None
+        self.data_lim = 10**8  # 100 MB
 
 
     def submemmap(self, ix, data):
@@ -112,8 +111,8 @@ class BaseImage:
             Trying to read data in chunks to handle HiResCt images
             '''
             to_read = bpp*matsize
-            read_lim = 10**8
-            print('Will read {} 100MB chunks.'.format(to_read/read_lim))
+            read_lim = self.data_lim
+            print('Will read {0} {1}MB chunks.'.format(to_read/read_lim,int(read_lim/10**6)))
             ix = 0
             while to_read > read_lim:
                 print('Reading new chunk; {}MB left'.format(int(to_read/10**6)))
@@ -234,8 +233,6 @@ class BaseImage:
         sf = self.struct_flags[ps.data_type]
 
         # read data from file
-        self.tempdir = tempfile.mkdtemp()
-        print('Making tempdir: {}'.format(self.tempdir))
         print('Reading image data...')
         
         img_file = open(self.filepath,'rb')
@@ -291,9 +288,8 @@ class BaseImage:
 
             total_pixels = len(data)
             bytes_to_write = total_pixels*bpp
-            write_lim = 10**8
-
-            print('Will write {} 100MB chunks.'.format(bytes_to_write/write_lim))
+            write_lim = self.data_lim
+            print('Will read {0} {1}MB chunks.'.format(bytes_to_write/write_lim,int(write_lim/10**6)))
             ix = 0
             while bytes_to_write > write_lim:
                 print('Writing new chunk; {}MB left'.format(int(bytes_to_write/10**6)))

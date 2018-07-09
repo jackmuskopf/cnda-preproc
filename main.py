@@ -6,12 +6,16 @@ import ntpath
 import atexit
 import gc
 import tkinter as tk
+import tempfile
+import shutil
 from tkinter import Tk
 from collections import defaultdict                
 from tkinter import font  as tkfont 
 from tkinter.filedialog import askopenfilename, askdirectory
 from preprocessing.classes.baseimage import *
 from preprocessing.classes.imageviewer import *
+
+TEMPLOG = 'templog.txt'
 
 
 
@@ -143,11 +147,17 @@ class ImageGUI(tk.Tk):
         self.splash.destroy()
         self.deiconify()
 
+    def load_image(self):
+        tdir = tempfile.mkdtemp()
+        log_temp_dir(tdir)
+        self.image_editor.image.tempdir = tdir
+        self.image_editor.image.load_image()
+
 
     def start_img(self,img):
         self.make_splash()       
         self.image_editor = ImageEditor(img,escale=self.escale)
-        self.image_editor.image.load_image()
+        self.load_image()
         self.tempdirs.append(self.image_editor.image.tempdir)
         self.stop_splash()
         self.show_frame("ImageRotator")
@@ -557,13 +567,49 @@ def is_pet(fname):
     else:
         return False
 
-def quit_app():
+def clean_temp_dirs():
+    if os.path.exists(TEMPLOG):
+        with open(TEMPLOG,'r') as tlog:
+            tlog_txt = tlog.read()
+        tdirs = list(set([d for d in tlog_txt.split('\n') if d]))
+        for d in tdirs:
+            try:
+                shutil.rmtree(d)
+                print('Removed tempdir: {}'.format(d))
+                tdirs.remove(d)
+            except Exception as e:
+                if not os.path.exists(d):
+                    tdirs.remove(d)
+                else:
+                    print('Failed to remove tempdir: {0}\n{1}'.format(directory,e))
+        with open(TEMPLOG,'w') as tlog:
+            tlog.write('\n'.join(tdirs))
+
+
+def log_temp_dir(directory):
+    if os.path.exists(TEMPLOG):
+        ap_wr = 'a'
+    else:
+        ap_wr = 'w'
+
+    tlog = open(TEMPLOG, ap_wr)
+    tlog.write('\n{}'.format(directory))
+    tlog.close()
+
+
+def exit_fn():
     app.remove_temp_dirs()
+    clean_temp_dirs()
+
+
+def quit_app():
+    exit_fn()
     app.destroy()
 
 
 if __name__ == "__main__":
+    clean_temp_dirs()
     data_folder = os.path.join('data','pcds')
     app = ImageGUI(folder=data_folder)
-    atexit.register(app.remove_temp_dirs)
+    atexit.register(exit_fn)
     app.mainloop()

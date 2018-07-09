@@ -6,6 +6,7 @@ __pycache__/
 
 # ignore all data
 data/
+testing/
 output/
 build/
 dist/
@@ -14,3 +15,4 @@ dist/
 # ignore all ipynb_checkpoints
 .ipynb_checkpoints/
 
+templog.txt
