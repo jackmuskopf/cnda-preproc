@@ -225,16 +225,15 @@ class ImageGUI(tk.Tk):
     def clean_memmaps(self):
         if self.image_editor is not None:
             if self.image_editor.image is not None:
-                if self.image_editor.image.cuts is not None:
-                    for cut in self.image_editor.image.cuts:
-                        delattr(cut,'img_data')
-                        fn = '{}.dat'.format(cut.filename.split('.')[0])
-                        fp = os.path.join(self.image_editor.image.tempdir,fn)
-                        os.remove(fp)
-                delattr(self.image_editor.image,'img_data')
+                self.image_editor.image.clean_cuts()
+                try:
+                    delattr(self.image_editor.image,'img_data')
+                except AttributeError:
+                    pass
                 fn = '{}.dat'.format(self.image_editor.image.filename.split('.')[0])
                 fp = os.path.join(self.image_editor.image.tempdir,fn)
-                os.remove(fp)
+                if os.path.exists(fp):
+                    os.remove(fp)
         self.image_editor = None
         gc.collect()
 
@@ -254,13 +253,13 @@ class ImageSelector(tk.Frame):
         # pad space
         tk.Label(self,text=' '*25).grid(column=0)
 
-        col_title_font = tkfont.Font(family='Helvetica', size=14)
-        tk.Label(self, text="PET Images", font=col_title_font).grid(row=2,column=self.petcol)
-        tk.Label(self, text="CT Images", font=col_title_font).grid(row=2,column=self.ctcol)
+        # col_title_font = tkfont.Font(family='Helvetica', size=14)
+        # tk.Label(self, text="PET Images", font=col_title_font).grid(row=2,column=self.petcol)
+        # tk.Label(self, text="CT Images", font=col_title_font).grid(row=2,column=self.ctcol)
 
         # browse for file
         tk.Button(self, text='Browse', command=self.browse_file).grid(row=1,column=1,columnspan=1,padx=(30,0),pady=(0,20))
-        tk.Button(self, text='Quit', command=quit_app).grid(row=1,column=2,columnspan=1,padx=(30,0),pady=(0,20))
+        tk.Button(self, text='Quit', command=exit_fn).grid(row=1,column=2,columnspan=1,padx=(30,0),pady=(0,20))
 
         self.make_buttons()
 
@@ -400,7 +399,11 @@ class ImageRotator(tk.Frame):
             if self.controller.image_editor.nmice == 1:
                 self.controller.view_ax = 'x'
                 im = self.controller.image_editor.image
-                self.controller.image_editor.image.cuts = [SubImage(im,im.img_data)]
+                fpcs = im.filename.split('.')
+                if not fpcs[0].endswith('_s1'):
+                    fpcs[0]+='_s1'
+                self.controller.image_editor.image.filename = '.'.join(fpcs)
+                self.controller.image_editor.image.cuts = [self.controller.image_editor.image] #[SubImage(parent_image=im,img_data=im.img_data,filename='.'.join(fpcs))]
                 self.controller.show_frame('CutViewer')
             else:
                 self.controller.show_frame('ImageCutter')
@@ -600,16 +603,19 @@ def log_temp_dir(directory):
 def exit_fn():
     app.remove_temp_dirs()
     clean_temp_dirs()
+    try:
+        app.destroy()
+    except:
+        pass
+    sys.exit(0)
 
-
-def quit_app():
-    exit_fn()
-    app.destroy()
 
 
 if __name__ == "__main__":
+    gc.collect()
     clean_temp_dirs()
+    atexit.register(exit_fn)
     data_folder = os.path.join('data','pcds')
     app = ImageGUI(folder=data_folder)
-    atexit.register(exit_fn)
+    app.protocol("WM_DELETE_WINDOW", exit_fn)
     app.mainloop()

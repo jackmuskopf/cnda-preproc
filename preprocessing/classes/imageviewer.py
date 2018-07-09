@@ -372,6 +372,7 @@ class ImageEditor(ImageViewer):
 
 	def cut_image(self):
 
+		self.image.clean_cuts()
 		cx,cy = self.cx,self.cy
 		img_data = self.image.img_data
 

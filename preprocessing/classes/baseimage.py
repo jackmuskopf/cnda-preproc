@@ -29,12 +29,12 @@ class BaseImage:
                 self.subject_id = fpcs[0] + fpcs[3].split('.')[0]
             else:
                 self.subject_id = fpcs[0]
-        self.cuts = None
+        self.cuts = []
         self.scale_factor = None
         self.scaled = None
         self.bpp = None # bytes per pixel
         self.tempdir = None
-        self.data_lim = 10**8  # 100 MB
+        self.data_lim = 10**7  # 10 MB
 
 
     def submemmap(self, ix, data):
@@ -44,6 +44,8 @@ class BaseImage:
         fnpcs[0] = fnpcs[0] + '_s{}'.format(ix)
         filename = '.'.join(fnpcs)
         img_temp_name = os.path.join(self.tempdir,'{}.dat'.format(filename.split('.')[0]))
+        if os.path.exists(img_temp_name):
+            os.remove(img_temp_name)
         dfile = np.memmap(img_temp_name, mode='w+', dtype='float32', shape=data.shape)
         dfile[:] = data[:]
         return filename, dfile
@@ -310,7 +312,7 @@ class BaseImage:
 
 
         print('Saving files...')
-        if self.cuts is None:
+        if not self.cuts:
             raise ValueError('Image has not been cut in BaseImage.save_cuts()')
         if path is None:
             raise ValueError('Path not specified')
@@ -334,8 +336,8 @@ class BaseImage:
                 hf.write(cut_hdr_str)
 
             out_data = cut_img.img_data
-            # out_data = out_data.reshape(cut_img.xdim*cut_img.ydim*cut_img.zdim,cut_img.nframes)
-            out_data.resize(cut_img.xdim*cut_img.ydim*cut_img.zdim,cut_img.nframes)
+            out_data = out_data.reshape(cut_img.xdim*cut_img.ydim*cut_img.zdim,cut_img.nframes)
+            # out_data.resize((cut_img.xdim*cut_img.ydim*cut_img.zdim,cut_img.nframes),refcheck=False)
             if self.scaled:
                 inv = lambda x: 1/x
                 v_inv = np.vectorize(inv)
@@ -354,7 +356,19 @@ class BaseImage:
                 # dfile.write(struct.pack(nd*sf,*out_data))
             print('File saved.')
 
-
+    def clean_cuts(self):
+        '''
+        remove existing cuts
+        '''
+        for cut in self.cuts:
+            try:
+                delattr(cut,'img_data')
+            except AttributeError:
+                pass
+            fn = '{}.dat'.format(cut.filename.split('.')[0])
+            fp = os.path.join(self.tempdir,fn)
+            if os.path.exists(fp):
+                os.remove(fp)
 
     def get_axis(self,axis):
         '''
@@ -477,6 +491,7 @@ class PETImage(BaseImage):
         self.xdim = self.params.x_dimension
         self.ydim = self.params.y_dimension
         self.zdim = self.params.z_dimension
+        self.x_dimension,self.y_dimension,self.z_dimension = self.xdim,self.ydim,self.zdim
 
         self.frame_range = None
         self.plane_range = None
@@ -517,6 +532,7 @@ class CTImage(BaseImage):
         self.xdim = self.params.x_dimension
         self.ydim = self.params.y_dimension
         self.zdim = self.params.z_dimension
+        self.x_dimension,self.y_dimension,self.z_dimension = self.xdim,self.ydim,self.zdim
 
         self.frame_range = None
         self.plane_range = None
@@ -527,5 +543,4 @@ class CTImage(BaseImage):
                     2 : (self.zdim, self.ydim)}
         self.scaled = None
 
-        self.cuts = None
 
