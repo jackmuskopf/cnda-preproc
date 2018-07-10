@@ -7,6 +7,7 @@ import atexit
 import gc
 import tkinter as tk
 import tempfile
+import traceback
 import shutil
 from tkinter import Tk
 from collections import defaultdict                
@@ -17,7 +18,12 @@ from preprocessing.classes.imageviewer import *
 
 TEMPLOG = 'templog.txt'
 
-
+def check_img_data(ie):
+    try:
+        getattr(ie.image,'img_data')
+        print('Yes img_data')
+    except AttributeError:
+        print('No img_data')
 
 class LoadScreen(tk.Toplevel):
     def __init__(self, parent, text):
@@ -101,7 +107,7 @@ class ImageGUI(tk.Tk):
         container.grid_columnconfigure(0, weight=1)
 
         self.frames = {}
-        for F in (ImageSelector, ImageRotator, ImageCutter, CutViewer, HeaderUI):
+        for F in (ImageSelector, ImageRotator, ImageCutter, CutViewer, HeaderUI, ConfirmSave):
             page_name = F.__name__
             frame = F(parent=container, controller=self)
             self.frames[page_name] = frame
@@ -137,7 +143,7 @@ class ImageGUI(tk.Tk):
         try:
             frame.re_init()
         except AttributeError as e:
-            print(e)
+            print_error(e)
 
     def make_splash(self,text='Loading...'):
         self.withdraw()
@@ -205,11 +211,12 @@ class ImageGUI(tk.Tk):
         label = tk.Label(frame,text=text,font=tkfont.Font(family='Helvetica', size=9),justify=tk.LEFT)
         return label
 
-    def init_img_info(self,frame):
+    def init_img_info(self,frame,coords=None):
         if frame.img_info is not None:
             frame.img_info.destroy()
         frame.img_info = self.get_img_info(frame)
-        coords = self.iicoords
+        if coords is None:
+            coords = self.iicoords
         frame.img_info.place(x=coords[0],y=coords[1])
 
     def remove_temp_dirs(self):
@@ -509,7 +516,7 @@ class CutViewer(tk.Frame):
         # back, next
         nbbx,nbby = 135,400
         tk.Button(self, text="Back",command=self.back).place(x=nbbx,y=nbby)
-        tk.Button(self, text="Save",command=self.save_cuts).place(x=nbbx+180,y=nbby)
+        tk.Button(self, text="Next",command=self.next).place(x=nbbx+180,y=nbby)
 
         # view axes
         vbx, vby = 200,220
@@ -539,6 +546,10 @@ class CutViewer(tk.Frame):
         else:
             self.controller.show_frame('ImageCutter')
 
+    def next(self):
+        self.controller.image_editor.stop_animation()
+        self.controller.show_frame('HeaderUI')
+
     def animate_cuts(self):
         self.controller.image_editor.stop_animation()
         if self.controller.image_editor.nmice == 1:
@@ -551,80 +562,211 @@ class CutViewer(tk.Frame):
         self.animate_cuts()
 
 
-    def save_cuts(self):
-        Tk().withdraw()
-        save_path = askdirectory()
-        if save_path:
-            self.controller.make_splash(text='Saving images...')
-            self.controller.image_editor.image.save_cuts(path=save_path)
-            self.controller.stop_splash()
-            self.controller.image_editor.stop_animation()
-            self.controller.remove_temp_dirs()
-            self.controller.frames['ImageSelector'].re_init()
-            self.controller.show_frame('ImageSelector')
+
 
 
 class HeaderUI(tk.Frame):
 
     def __init__(self, parent, controller):
-
-        ### TODO ###
-        # layout entry labels and boxes, corresponding to obj attr
-        # init obj attr
-        # iterate cuts, as started in re_init()
-        
         
         tk.Frame.__init__(self, parent)
         self.controller = controller
         self.img_info = None
+
+        # local image editor for controlling animation of each cut
+        self.ie = None
+        self.cut = None
+
+
+        # pad space
+        tk.Label(self,text=' '*30).grid(column=0)
         
         # title
         label = tk.Label(self, text="Header Information", font=controller.title_font)
         label.grid(row=0,column=1,columnspan=2,padx=(30,0),pady=(0,20))
-
-        # back, next
-        nbbr,nbbc = 0,0
-        tk.Button(self, text="Back",command=self.back).grid(column=nbbc,row=nbbr)
-        tk.Button(self, text="Save",command=self.save_cuts).grid(column=nbbc=1,row=nbbr)
 
 
         # exposure scale
         self.escale_label = None
         self.escale_apply = None
         self.escaler = None
-        self.controller.init_escaler(self)
+
         
 
-    def re_init(self, cutn=0):
-        if cutn > len(self.image_editor.image.cuts):
-            self.ask_save()
-        self.controller.init_img_info(self)
+
+    def re_init(self):
+
+        self.cut_ix = 0
+        
+        # coords for placing entry boxes and labels
+        self.er,self.ec = 1,1
+        self.hdr_attrs = ['filename','animal_number','subject_weight']
+
+        # input file info
+        if self.controller.image_editor.image.type == 'ct':
+            pass
+        elif self.controller.image_editor.image.type == 'pet':
+            self.hdr_attrs += ['dose','injection_time']
+        else:
+            raise ValueError('Unexpected image type: {}'.format(self.controller.image_editor.image.type))
+
+
+        try:
+            self.destroy_buttons()
+        except AttributeError:
+            pass
+
+        self.controller.init_img_info(self,coords=(30,300))
         self.controller.init_escaler(self)
+
+        er,ec = self.er,self.ec
+        for i,attr in enumerate(self.hdr_attrs):
+            setattr(self,attr,tk.StringVar(value=''))
+            entry = tk.Entry(self,textvariable=getattr(self,attr),width=40)
+            entry_attr = attr+'_entry'
+            setattr(self,entry_attr,entry)
+            getattr(self,entry_attr).grid(row=er+i,column=ec+1)
+            label_attr = attr+'_label'
+            setattr(self,label_attr,tk.Label(self,text=get_label(attr)))
+            getattr(self,label_attr).grid(row=er+i,column=ec)
+
+        # back, next
+        nbbr,nbbc = self.er+len(self.hdr_attrs),self.ec
+        self.back_button = tk.Button(self, text="Back",command=self.back)
+        self.back_button.grid(column=nbbc,row=nbbr)
+        self.next_button = tk.Button(self, text="Next",command=self.increment_cut)
+        self.next_button.grid(column=nbbc+1,row=nbbr)
+
+        self.cut = self.controller.image_editor.image.cuts[0]
+        self.init_cut()
+
+
+
+    def increment_cut(self):
+        self.update_cut()
+        self.cut_ix += 1
+        if self.cut_ix < len(self.controller.image_editor.image.cuts):
+            self.cut = self.controller.image_editor.image.cuts[self.cut_ix]
+            self.init_cut()
+        else:
+            self.destroy_buttons()
+            self.controller.show_frame('ConfirmSave')
+
+
+    def decrement_cut(self):
+        self.cut_ix -= 1
+        self.cut = self.controller.image_editor.image.cuts[self.cut_ix]
+        self.init_cut()
+
+
+    def init_cut(self):
+        self.init_entries()
         self.init_ani()
 
     def init_ani(self):
-        self.animate_cuts()
+        self.controller.image_editor.stop_animation()
+        self.ie = ImageEditor(self.cut, escale=self.controller.image_editor.escale)
+        self.ie.animate_axes()
+
+    def init_entries(self):
+        for attr in self.hdr_attrs:
+            if not (attr=='filename'):
+                getattr(self,attr).set(getattr(self.cut.params,attr))
+
+        self.filename.set(self.cut.filename)
+
+    def update_cut(self):
+        for attr in self.hdr_attrs:
+            entry_attr = attr+'_entry'
+            entry = getattr(self,entry_attr)
+            val = entry.get()
+            if attr=='filename':
+                self.cut.filename = val
+            else:
+                setattr(self.cut.params, attr, val)
+
+    def destroy_buttons(self):
+        
+        for attr in self.hdr_attrs:
+            entry_attr = attr+'_entry'
+            label_attr = attr+'_label'
+            getattr(self,entry_attr).destroy()
+            getattr(self,label_attr).destroy()
+        self.next_button.destroy()
+        self.back_button.destroy()
+
+
+    def back(self):
+        self.update_cut()
+        if self.cut_ix > 0:
+            self.decrement_cut()
+        else:
+            self.destroy_buttons()
+            self.controller.image_editor.stop_animation()
+            self.controller.show_frame('CutViewer')
+
+
+
+class ConfirmSave(tk.Frame):
+
+    def __init__(self, parent, controller):
+
+        tk.Frame.__init__(self, parent)
+        self.controller = controller
+
+
+    def re_init(self):
+        # pad space
+        tk.Label(self,text=' '*30).grid(column=0)
+        
+        # title
+        label = tk.Label(self, text="Confirm", font=self.controller.title_font)
+        label.grid(row=0,column=0,columnspan=2,padx=(30,0),pady=(0,20))        
+
+        params_to_display = ['animal_number','injection_time','dose','subject_weight','filename']
+        for i,cut in enumerate(self.controller.image_editor.image.cuts):
+            for j,param in enumerate(params_to_display):
+                jx=j+1
+                if param == 'filename':
+                    val = cut.filename
+                else:
+                    try:
+                        val = getattr(cut.params,param)
+                    except AttributeError:
+                        val = None
+                if val is not None:
+                    r,c = jx+(i//2)*len(params_to_display),i%2
+                    r = r+1 if i>1 else r
+                    px = c*10+5
+                    tk.Label(self,text='{0} : {1}'.format(get_label(param),val)).grid(row=r,column=c,padx=(px,0))
+        
+        # space
+        tk.Label(self,text=' '*50).grid(row=6,column=0,columnspan=2)
+        tk.Label(self,text=' '*50).grid(row=12,column=0,columnspan=2)
+
+        brow = len(params_to_display)*2+3
+        self.back_button = tk.Button(self, text="Back",command=self.back)
+        self.back_button.grid(column=0,row=brow)
+        self.save_button = tk.Button(self, text="Save",command=self.save_cuts)
+        self.save_button.grid(column=1,row=brow)
+        self.init_ani()
+
+    def init_ani(self):
+        self.controller.image_editor.animate_cuts()
+
+
+    def clear_widgets(self):
+        for widget in self.winfo_children():
+            widget.destroy()
 
     def back(self):
         self.controller.image_editor.stop_animation()
-        if self.controller.image_editor.nmice == 1:
-            self.controller.show_frame('ImageRotator')
-        else:
-            self.controller.show_frame('ImageCutter')
+        self.controller.show_frame('HeaderUI')
 
-    def animate_cuts(self):
-        self.controller.image_editor.stop_animation()
-        if self.controller.image_editor.nmice == 1:
-            self.controller.image_editor.animate_collapse(self.controller.view_ax)
-        else:
-            self.controller.image_editor.animate_cuts(self.controller.view_ax)
-
-    def change_ax(self,ax):
-        self.controller.view_ax = ax
-        self.animate_cuts()
 
 
     def save_cuts(self):
+        raise Exception('Not implemented yet')
         Tk().withdraw()
         save_path = askdirectory()
         if save_path:
@@ -640,6 +782,16 @@ class HeaderUI(tk.Frame):
 
 
 # functions
+
+def get_label(attr_name):
+    if attr_name == 'dose':
+        return 'Injection Dose'
+    elif attr_name == 'injection_time':
+        return 'Injection Datetime'
+    else:
+        return attr_name.replace('_',' ').title()
+
+
 def is_pet(fname):
     if 'pet' in fname and '.ct' not in fname and fname.endswith('.img'):
         return True
@@ -660,7 +812,7 @@ def clean_temp_dirs():
                 if not os.path.exists(d):
                     tdirs.remove(d)
                 else:
-                    print('Failed to remove tempdir: {0}\n{1}'.format(directory,e))
+                    print('Failed to remove tempdir: {0}\n{1}'.format(d,e))
         with open(TEMPLOG,'w') as tlog:
             tlog.write('\n'.join(tdirs))
 
@@ -676,22 +828,29 @@ def log_temp_dir(directory):
     tlog.close()
 
 
-def exit_fn():
-    app.remove_temp_dirs()
+def exit_fn(app):
+    app.image_editor.stop_animation()
+    app.destroy()
+    del app
+    gc.collect()
     clean_temp_dirs()
-    try:
-        app.destroy()
-    except:
-        pass
     sys.exit(0)
 
+
+def print_error(e):
+    exc_info = sys.exc_info()
+    exc_type, exc_obj, exc_tb = exc_info
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    traceback.print_exception(*exc_info)
+    print('{}\n'.format(e),exc_type, fname, exc_tb.tb_lineno)
+    
 
 
 if __name__ == "__main__":
     gc.collect()
     clean_temp_dirs()
-    atexit.register(exit_fn)
+    # atexit.register(exit_fn)
     data_folder = os.path.join('data','pcds')
     app = ImageGUI(folder=data_folder)
-    app.protocol("WM_DELETE_WINDOW", exit_fn)
+    app.protocol("WM_DELETE_WINDOW", lambda app=app:exit_fn(app))
     app.mainloop()

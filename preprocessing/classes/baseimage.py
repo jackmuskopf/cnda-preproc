@@ -2,12 +2,16 @@ import os
 import sys
 import struct
 import numpy as np
+import gc
+import copy
 import ntpath
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import warnings
 
-from collections import namedtuple
+class Params:
+    def __init__(self,**kwargs):
+        self.__dict__.update(kwargs)
 
 class BaseImage:
 
@@ -57,12 +61,14 @@ class BaseImage:
         parses parameters from header file; checks line by line if line starts with keyword;
         uses first instance of keyword unless keyword in per_frame (in which case uses np.array)
         '''
+
         hdr_file = open(self.header_file, 'r')
         hdr_string = hdr_file.read()
         hdr_lines = hdr_string.split('\n')
 
         kwrds = self.keywords
         integers = self.integers
+        strings = self.strings
         per_frame = self.per_frame
         params = {kw : None for kw in kwrds}
 
@@ -70,7 +76,7 @@ class BaseImage:
             for line in hdr_lines:
                 kv = params[kw]
                 try:
-                    if kw == line.strip()[0:len(kw)]:
+                    if kw ==  line.strip().split(' ')[0]: # line.strip()[0:len(kw)]:  #
                         if kw in per_frame:
                             if kv is None:
                                 params[kw] = np.array([])
@@ -79,18 +85,21 @@ class BaseImage:
                             ks = line.strip().split(' ')[1]
                             if kw in integers:
                                 params[kw] = int(ks)
+                            elif kw in strings:
+                                params[kw] = ' '.join(line.strip().split(' ')[1:])
                             else:
                                 params[kw] = float(ks)
                 except IndexError:
                     pass
 
-        failed = [kw for kw in kwrds if params[kw] is None]
+        ok_miss = ['animal_number']
+        failed = [kw for kw in kwrds if params[kw] is None and kw not in ok_miss]
         if any(failed):
             raise ValueError('Failed to parse parameters: {}'.format(', '.join(failed)))
         hdr_file.close()
     
-        Parameters = namedtuple('Parameters',' '.join(kwrds))
-        self.params = Parameters(**params)
+        # Parameters = recordclass('Parameters',' '.join(kwrds))
+        self.params = Params(**params)
         return
 
 
@@ -274,6 +283,7 @@ class BaseImage:
             self.img_data = imgmat.reshape(nplanes,ps.y_dimension,ps.x_dimension,nframes)
             self.scaled = True
 
+        self.rotate_on_axis('x')
         return
 
 
@@ -322,6 +332,7 @@ class BaseImage:
         hdr_string = hdr_file.read()
         hdr_lines = hdr_string.split('\n')
         for i,cut_img in enumerate(self.cuts):
+            cut_img.rotate_on_axis('x')
             cut_hdr_lines = hdr_lines
             for dim in ['x_dimension','y_dimension','z_dimension']:
                 for j,line in enumerate(cut_hdr_lines):
@@ -360,15 +371,20 @@ class BaseImage:
         '''
         remove existing cuts
         '''
-        for cut in self.cuts:
-            try:
-                delattr(cut,'img_data')
-            except AttributeError:
-                pass
-            fn = '{}.dat'.format(cut.filename.split('.')[0])
-            fp = os.path.join(self.tempdir,fn)
-            if os.path.exists(fp):
-                os.remove(fp)
+        if len(self.cuts)>1:
+            for cut in self.cuts:
+                try:
+                    delattr(cut,'img_data')
+                except AttributeError:
+                    pass
+                fn = '{}.dat'.format(cut.filename.split('.')[0])
+                fp = os.path.join(self.tempdir,fn)
+                if os.path.exists(fp):
+                    os.remove(fp)
+
+        else:   # don't want to delete original img_data (just one cut uses original img data)
+            self.cuts = []
+            gc.collect()
 
     def get_axis(self,axis):
         '''
@@ -450,6 +466,8 @@ class SubImage(BaseImage):
         shape = self.img_data.shape
         self.zdim, self.ydim, self.xdim, self.nframes = shape
         self.x_dimension,self.y_dimension,self.z_dimension = self.xdim,self.ydim,self.zdim
+        self.params = copy.copy(parent_image.params)
+        self.params.x_dimension,self.params.y_dimension,self.params.z_dimension, self.params.total_frames = self.xdim,self.ydim,self.zdim, self.nframes
         self.bounds={0 : (self.ydim, self.xdim), 
                     1 : (self.xdim, self.zdim),
                     2 : (self.zdim, self.ydim)}
@@ -480,9 +498,14 @@ class PETImage(BaseImage):
                 'calibration_factor',
                 'scale_factor',
                 'isotope_branching_fraction',
-                'frame_duration']
+                'frame_duration',
+                'animal_number',
+                'subject_weight',
+                'dose',
+                'injection_time']
         self.integers = ['data_type','z_dimension','total_frames','x_dimension','y_dimension']
         self.per_frame = ['scale_factor','frame_duration'] 
+        self.strings = ['injection_time']
 
 
         self.header_file = filepath+'.hdr'
@@ -524,10 +547,13 @@ class CTImage(BaseImage):
                 'total_frames',
                 'calibration_factor',
                 'scale_factor',
-                'frame_duration']
+                'animal_number',
+                'frame_duration',
+                'subject_weight']
 
         self.integers = ['data_type','z_dimension','total_frames','x_dimension','y_dimension']
         self.per_frame = ['scale_factor','frame_duration'] 
+        self.strings = []
         self.load_header()
         self.xdim = self.params.x_dimension
         self.ydim = self.params.y_dimension
