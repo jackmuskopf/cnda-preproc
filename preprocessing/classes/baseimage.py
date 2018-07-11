@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import warnings
 
+from pprint import pprint
+import inspect
+
 class Params:
     def __init__(self,**kwargs):
         self.__dict__.update(kwargs)
@@ -49,7 +52,7 @@ class BaseImage:
         filename = '.'.join(fnpcs)
         img_temp_name = os.path.join(self.tempdir,'{}.dat'.format(filename.split('.')[0]))
         if os.path.exists(img_temp_name):
-            os.remove(img_temp_name)
+            try_rmfile(img_temp_name)
         dfile = np.memmap(img_temp_name, mode='w+', dtype='float32', shape=data.shape)
         dfile[:] = data[:]
         return filename, dfile
@@ -289,6 +292,23 @@ class BaseImage:
 
     def save_cuts(self,path):
 
+        def add_animal_number(hdr_lines,animal_number):
+            for i,line in enumerate(hdr_lines):
+                if line.strip().startswith('subject_identifier'):
+                    return hdr_lines[:i] + [
+                            '#','# animal_number (string)', '#',
+                            'animal_number {}'.format(animal_number.strip())
+                            ] + hdr_lines[i:]
+
+        def change_line(hdr_lines,hdr_var,value):
+            '''
+            Update line to match value in parameters (user input)
+            '''
+            for j,line in enumerate(hdr_lines):
+                if line.strip().startswith(hdr_var):
+                    hdr_lines[j] = ' '.join([hdr_var,value])
+                    break
+            return hdr_lines
 
         def write_chunks(data, dfile):
             '''
@@ -332,13 +352,22 @@ class BaseImage:
         hdr_string = hdr_file.read()
         hdr_lines = hdr_string.split('\n')
         for i,cut_img in enumerate(self.cuts):
+            
+            # did this when reading image data, flip it back now
             cut_img.rotate_on_axis('x')
+            
+            # update header variables
             cut_hdr_lines = hdr_lines
-            for dim in ['x_dimension','y_dimension','z_dimension']:
-                for j,line in enumerate(cut_hdr_lines):
-                    if line.strip().startswith(dim):
-                        cut_hdr_lines[j] = ' '.join([dim,str(getattr(cut_img,dim))])
-                        break
+            vars_to_update = ['x_dimension','y_dimension','z_dimension','dose','subject_weight','injection_time']
+            for v in vars_to_update:
+                cut_hdr_lines = change_line(cut_hdr_lines,v,str(getattr(cut_img.params,v)))
+            
+            # add animal_number to header information if it has been set
+            animal_number = cut_img.params.animal_number
+            if animal_number.strip():
+                cut_hdr_lines = add_animal_number(cut_hdr_lines,animal_number)
+
+
             cut_filename = cut_img.filename
             cut_hdr_name = cut_filename+'.hdr'
             cut_hdr_str = '\n'.join(cut_hdr_lines)
@@ -371,6 +400,7 @@ class BaseImage:
         '''
         remove existing cuts
         '''
+        gc.collect()
         if len(self.cuts)>1:
             for cut in self.cuts:
                 try:
@@ -378,9 +408,12 @@ class BaseImage:
                 except AttributeError:
                     pass
                 fn = '{}.dat'.format(cut.filename.split('.')[0])
+                
+                del cut
+                gc.collect()  
                 fp = os.path.join(self.tempdir,fn)
                 if os.path.exists(fp):
-                    os.remove(fp)
+                    try_rmfile(fp)
 
         else:   # don't want to delete original img_data (just one cut uses original img data)
             self.cuts = []
@@ -570,3 +603,10 @@ class CTImage(BaseImage):
         self.scaled = None
 
 
+# functions
+def try_rmfile(path):
+    try:
+        os.remove(path)
+    except Exception as e:
+        print(e)
+        print('Failed to remove file: {}'.format(os.path.split(path)[1]))

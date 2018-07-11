@@ -3,6 +3,7 @@ import matplotlib.animation as animation
 import matplotlib.gridspec as gridspec
 import numpy as np
 import warnings
+import gc
 from .baseimage import PETImage, SubImage
 
 class ImageViewer:
@@ -190,13 +191,15 @@ class ImageViewer:
 			return imgs
 
 
-		# prevents error in matplotlib.animation if only one image
+		
 		img_data = self.image.img_data
 		nframes = img_data.shape[-1]
 		xblock = getattr(img_data,self.collapse)(axis=self.image.get_axis('x'))
 		yblock = getattr(img_data,self.collapse)(axis=self.image.get_axis('y'))
 		zblock = getattr(img_data,self.collapse)(axis=self.image.get_axis('z'))
-		
+		img_data = None
+		gc.collect()
+
 		# normalize blocks
 		xblock = (self.escale/xblock.max())*xblock
 		yblock = (self.escale/yblock.max())*yblock
@@ -209,6 +212,8 @@ class ImageViewer:
 
 		# swap x axes (for visualization)
 		xmats = self.swap_x(xmats)
+
+		# prevents error in matplotlib.animation if only one image
 		if len(xmats)==1 or len(ymats)==1 or len(zmats)==1:
 			xmats = xmats+xmats
 			ymats = ymats+ymats
@@ -465,8 +470,11 @@ class ImageEditor(ImageViewer):
 		else:
 			raise ValueError('ImageEditor with cutter = {} calling self.cut_image()'.format(self.cutter))
 
+		img_data = None
+		gc.collect()
 
-	def animate_cuts(self, view_ax='z'):
+
+	def animate_cuts(self, title='', view_ax='z'):
 		
 		def genIx():
 			dt = 1
@@ -484,26 +492,27 @@ class ImageEditor(ImageViewer):
 
 		self.check_nmice()
 
-		if self.image.cuts is None:
+		if not self.image.cuts:
 			raise ValueError('Image has not been cut in ImageEditor.animate_cuts.')
 
 		# for splitting collapsed data into frames
 		split_frames = lambda x: self.image.split_on_axis(x,2)
 		
-		fdata = self.image.img_data
+		fdata = self.image.img_data	# free this
 		axis = self.image.get_axis(view_ax)
 		fdata = getattr(fdata,self.collapse)(axis=axis)
 		scale = self.escale/fdata.max()
 		fdata = fdata*scale
 		fmats = split_frames(fdata)
 		nframes = len(fmats)
-
-		cuts = self.image.cuts
-		cuts = [cut.img_data for cut in cuts]
-		ncuts = len(cuts)
+		fdata = None # freed
 		
 
-		cuts = [getattr(img_data,self.collapse)(axis=axis)*scale for img_data in cuts]
+		cuts = self.image.cuts # free this
+		cuts = [cut.img_data for cut in cuts]
+		ncuts = len(cuts)
+
+		cuts = [getattr(img_data,self.collapse)(axis=axis)*scale for img_data in cuts]  # freed
 		cuts = [split_frames(img_data) for img_data in cuts]
 		
 		if len(fmats) == 1:
@@ -515,8 +524,12 @@ class ImageEditor(ImageViewer):
 			fmats = self.swap_x(fmats)
 			cuts = [self.swap_x(frames) for frames in cuts]
 
+			
+		gc.collect() 
+
 		# plotting
 		fig = plt.figure()
+		plt.title(title)
 		shapes = [cl[0].shape for cl in cuts]	# for grid formatting
 		
 		if self.cutter == 'vertical':
@@ -610,3 +623,5 @@ class ImageEditor(ImageViewer):
 		    repeat=True)
 		plt.tight_layout()
 		plt.show()
+
+		

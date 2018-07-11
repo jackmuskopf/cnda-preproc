@@ -8,13 +8,15 @@ import gc
 import tkinter as tk
 import tempfile
 import traceback
+import inspect
 import shutil
+import numpy as np
 from tkinter import Tk
 from collections import defaultdict                
 from tkinter import font  as tkfont 
 from tkinter.filedialog import askopenfilename, askdirectory
-from preprocessing.classes.baseimage import *
-from preprocessing.classes.imageviewer import *
+from preprocessing.classes.baseimage import PETImage, CTImage, SubImage
+from preprocessing.classes.imageviewer import ImageEditor
 
 TEMPLOG = 'templog.txt'
 
@@ -25,10 +27,12 @@ def check_img_data(ie):
     except AttributeError:
         print('No img_data')
 
-class LoadScreen(tk.Toplevel):
-    def __init__(self, parent, text):
+class SplashScreen(tk.Toplevel):
+    def __init__(self, parent, text, yn=False):
+        self.__name__ = 'LoadScreen'
         tk.Toplevel.__init__(self, parent)
-        w = 500 # width for the Tk root
+        self.parent = parent
+        w = 530 # width for the Tk root
         h = 250 # height for the Tk root
 
         # get screen width and height
@@ -43,13 +47,24 @@ class LoadScreen(tk.Toplevel):
         # and where it is placed
         self.geometry('%dx%d+%d+%d' % (w, h, x, y))
         self.title("Image Preprocessing")
-        label = tk.Label(self, text=text, font=tkfont.Font(family='Helvetica', size=18, weight="bold", slant="italic"))
+
+        # size buttons
+        sz = 18 if not yn else 11
+        label = tk.Label(self, text=text, font=tkfont.Font(family='Helvetica', size=sz, weight="bold", slant="italic"))
         label.pack(side="top", fill="x", pady=10)
 
+        if yn:
+            tk.Button(self, text="Yes",command=lambda:self.return_yn(True)).pack(side=tk.RIGHT, fill="x", padx=(0,120))
+            tk.Button(self, text="No",command=lambda:self.return_yn(False)).pack(side=tk.LEFT, fill="x", padx=(120,0))
+        
         ## required to make window show before the program gets to the mainloop
         self.update()
 
 
+    def return_yn(self,yn):
+        print('Setting splash_yn: {}'.format(yn))
+        self.parent.splash_yn = yn
+        self.parent.stop_splash()
 
 
 
@@ -57,6 +72,7 @@ class ImageGUI(tk.Tk):
 
     def __init__(self, folder='data'):
         tk.Tk.__init__(self)
+        self.__name__ = 'ImageGUI'
         self.title("Image Preprocessing")
         w = 500 # width for the Tk root
         h = 550 # height for the Tk root
@@ -96,6 +112,16 @@ class ImageGUI(tk.Tk):
         # attribute to hold splash screen
         self.splash = None
 
+        # attribute to hold which frame is raised
+        self.raised_frame = None
+
+        # attribute to hold which frame was raised last
+        self.last_frame = None
+
+        # attribute to hold result from splash y/n var
+        self.splash_yn = None
+
+        # title font var
         self.title_font = tkfont.Font(family='Helvetica', size=18, weight="bold", slant="italic")
 
         # the container is where we'll stack a bunch of frames
@@ -138,6 +164,8 @@ class ImageGUI(tk.Tk):
     def show_frame(self, page_name):
         '''Show a frame for the given page name'''
         frame = self.frames[page_name]
+        self.last_frame = self.raised_frame
+        self.raised_frame = frame.__name__
         frame.tkraise()
 
         try:
@@ -145,9 +173,9 @@ class ImageGUI(tk.Tk):
         except AttributeError as e:
             print_error(e)
 
-    def make_splash(self,text='Loading...'):
+    def make_splash(self,text='Loading...',yn=False):
         self.withdraw()
-        self.splash = LoadScreen(self,text=text)
+        self.splash = SplashScreen(self,text=text,yn=yn)
 
     def stop_splash(self):
         self.splash.destroy()
@@ -249,6 +277,7 @@ class ImageSelector(tk.Frame):
 
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
+        self.__name__ = 'ImageSelector'
         self.controller = controller
         self.controller.remove_temp_dirs()
         label = tk.Label(self, text="Select Image", font=controller.title_font)
@@ -260,13 +289,14 @@ class ImageSelector(tk.Frame):
         # pad space
         tk.Label(self,text=' '*25).grid(column=0)
 
+        ## labels for displayed image types
         # col_title_font = tkfont.Font(family='Helvetica', size=14)
         # tk.Label(self, text="PET Images", font=col_title_font).grid(row=2,column=self.petcol)
         # tk.Label(self, text="CT Images", font=col_title_font).grid(row=2,column=self.ctcol)
 
         # browse for file
         tk.Button(self, text='Browse', command=self.browse_file).grid(row=1,column=1,columnspan=1,padx=(30,0),pady=(0,20))
-        tk.Button(self, text='Quit', command=exit_fn).grid(row=1,column=2,columnspan=1,padx=(30,0),pady=(0,20))
+        tk.Button(self, text='Quit', command=lambda app=self.controller:exit_fn(app)).grid(row=1,column=2,columnspan=1,padx=(30,0),pady=(0,20))
 
         self.make_buttons()
 
@@ -317,6 +347,7 @@ class ImageRotator(tk.Frame):
 
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
+        self.__name__ = 'ImageRotator'
         self.controller = controller
         self.img_info = None
         
@@ -324,12 +355,8 @@ class ImageRotator(tk.Frame):
         label = tk.Label(self, text="Image Rotator", font=controller.title_font)
         label.pack(side="top", fill="x", pady=10)
         
-        # indicate nmice reminder
-        tk.Label(self, 
-            text="Number of mice must be indicated before continuing.", 
-            font=tkfont.Font(family='Helvetica', size=12, weight="bold"),
-            fg='red'
-            ).pack(side="top",fill="x",pady=15)
+        # reminder to specify nmice
+        self.nmice_msg = None
 
         # rotator instructions
         tk.Label(self, 
@@ -415,6 +442,7 @@ class ImageRotator(tk.Frame):
             else:
                 self.controller.show_frame('ImageCutter')
         else:
+            self.nmice_warn()
             print('Specify number of mice before continuing.')
 
     def set_nmice(self):
@@ -423,11 +451,22 @@ class ImageRotator(tk.Frame):
             self.controller.image_editor.nmice = self.tknmice.get()
             self.controller.nmice = self.tknmice.get()
 
+    def nmice_warn(self):
+        if self.nmice_msg:
+            self.nmice_msg.destroy()
+        color = np.random.choice(["blue","red","green","purple","orange","maroon","cyan","indigo","yellow","violet","pink","turquoise"])
+        self.nmice_msg = tk.Label(self, 
+            text="Number of mice must be indicated before continuing.", 
+            font=tkfont.Font(family='Helvetica', size=12, weight="bold"),
+            fg=color)
+        self.nmice_msg.pack(side="top",fill="x",pady=15)
+
 
 class ImageCutter(tk.Frame):
 
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
+        self.__name__ = 'ImageCutter'
         self.controller = controller
         self.img_info = None
 
@@ -504,6 +543,7 @@ class CutViewer(tk.Frame):
     def __init__(self, parent, controller):
         
         tk.Frame.__init__(self, parent)
+        self.__name__ = 'CutViewer'
         self.controller = controller
         self.view_ax = 'z'
 
@@ -555,7 +595,7 @@ class CutViewer(tk.Frame):
         if self.controller.image_editor.nmice == 1:
             self.controller.image_editor.animate_collapse(self.controller.view_ax)
         else:
-            self.controller.image_editor.animate_cuts(self.controller.view_ax)
+            self.controller.image_editor.animate_cuts(view_ax=self.controller.view_ax)
 
     def change_ax(self,ax):
         self.controller.view_ax = ax
@@ -568,23 +608,21 @@ class CutViewer(tk.Frame):
 class HeaderUI(tk.Frame):
 
     def __init__(self, parent, controller):
+
+        self.__name__ = 'HeaderUI'
         
         tk.Frame.__init__(self, parent)
+        self.parent = parent
         self.controller = controller
         self.img_info = None
 
         # local image editor for controlling animation of each cut
         self.ie = None
         self.cut = None
-
+        self.title = None
 
         # pad space
-        tk.Label(self,text=' '*30).grid(column=0)
-        
-        # title
-        label = tk.Label(self, text="Header Information", font=controller.title_font)
-        label.grid(row=0,column=1,columnspan=2,padx=(30,0),pady=(0,20))
-
+        tk.Label(self,text=' '*30).grid(column=0)  
 
         # exposure scale
         self.escale_label = None
@@ -595,8 +633,8 @@ class HeaderUI(tk.Frame):
 
 
     def re_init(self):
-
-        self.cut_ix = 0
+        self.reset_attrs()
+        self.cut_ix = 0 if self.controller.last_frame == 'CutViewer' else len(self.controller.image_editor.image.cuts)-1
         
         # coords for placing entry boxes and labels
         self.er,self.ec = 1,1
@@ -616,7 +654,7 @@ class HeaderUI(tk.Frame):
         except AttributeError:
             pass
 
-        self.controller.init_img_info(self,coords=(30,300))
+        self.controller.init_img_info(self,coords=(30,self.controller.escaler_y))
         self.controller.init_escaler(self)
 
         er,ec = self.er,self.ec
@@ -630,15 +668,25 @@ class HeaderUI(tk.Frame):
             setattr(self,label_attr,tk.Label(self,text=get_label(attr)))
             getattr(self,label_attr).grid(row=er+i,column=ec)
 
+        # add title
+        self.update_title()
+
         # back, next
-        nbbr,nbbc = self.er+len(self.hdr_attrs),self.ec
+        nbbx,nbby = 135,400
         self.back_button = tk.Button(self, text="Back",command=self.back)
-        self.back_button.grid(column=nbbc,row=nbbr)
+        self.back_button.place(x=nbbx,y=nbby)
         self.next_button = tk.Button(self, text="Next",command=self.increment_cut)
-        self.next_button.grid(column=nbbc+1,row=nbbr)
+        self.next_button.place(x=nbbx+180,y=nbby)
 
         self.cut = self.controller.image_editor.image.cuts[0]
         self.init_cut()
+
+
+    def update_title(self):
+        if self.title is not None:
+            self.title.destroy()
+        self.title = tk.Label(self, text="Cut {} Header Information".format(self.cut_ix+1), font=self.controller.title_font, justify=tk.LEFT)
+        self.title.grid(row=0,column=1,columnspan=2,padx=(0,0),pady=(10,20))
 
 
 
@@ -646,15 +694,19 @@ class HeaderUI(tk.Frame):
         self.update_cut()
         self.cut_ix += 1
         if self.cut_ix < len(self.controller.image_editor.image.cuts):
+            self.update_title()
             self.cut = self.controller.image_editor.image.cuts[self.cut_ix]
             self.init_cut()
         else:
             self.destroy_buttons()
+            self.controller.image_editor.stop_animation()
+            self.reset_attrs()
             self.controller.show_frame('ConfirmSave')
 
 
     def decrement_cut(self):
         self.cut_ix -= 1
+        self.update_title()
         self.cut = self.controller.image_editor.image.cuts[self.cut_ix]
         self.init_cut()
 
@@ -670,8 +722,10 @@ class HeaderUI(tk.Frame):
 
     def init_entries(self):
         for attr in self.hdr_attrs:
-            if not (attr=='filename'):
-                getattr(self,attr).set(getattr(self.cut.params,attr))
+            if (not attr=='filename'):
+                _ = getattr(self.cut.params,attr)
+                if _ is not None:
+                    getattr(self,attr).set(_)
 
         self.filename.set(self.cut.filename)
 
@@ -679,7 +733,7 @@ class HeaderUI(tk.Frame):
         for attr in self.hdr_attrs:
             entry_attr = attr+'_entry'
             entry = getattr(self,entry_attr)
-            val = entry.get()
+            val = entry.get().strip()
             if attr=='filename':
                 self.cut.filename = val
             else:
@@ -695,6 +749,11 @@ class HeaderUI(tk.Frame):
         self.next_button.destroy()
         self.back_button.destroy()
 
+    def reset_attrs(self):
+        self.ie = None
+        self.cut = None
+        gc.collect()
+
 
     def back(self):
         self.update_cut()
@@ -703,6 +762,7 @@ class HeaderUI(tk.Frame):
         else:
             self.destroy_buttons()
             self.controller.image_editor.stop_animation()
+            self.reset_attrs()
             self.controller.show_frame('CutViewer')
 
 
@@ -713,6 +773,7 @@ class ConfirmSave(tk.Frame):
 
         tk.Frame.__init__(self, parent)
         self.controller = controller
+        self.__name__ = 'ConfirmSave'
 
 
     def re_init(self):
@@ -763,25 +824,46 @@ class ConfirmSave(tk.Frame):
         self.controller.image_editor.stop_animation()
         self.controller.show_frame('HeaderUI')
 
+    def check_paths(self, path):
+        new_files = [os.path.join(path,cut.filename) for cut in self.controller.image_editor.image.cuts]
+        for f in new_files:
+            overwrite = [tf for tf in (f,f+'.hdr') if os.path.exists(tf)]
+            if overwrite:
+                ow_msg = '\n'.join(['The following files will be overwritten:']+overwrite+['Do you want to continue?'])
+                self.controller.make_splash(text=ow_msg, yn=True)
+                print('Returning {}'.format(self.controller.splash_yn))
+                return self.controller.splash_yn
+            else:
+                return True
+
+
 
 
     def save_cuts(self):
-        raise Exception('Not implemented yet')
         Tk().withdraw()
         save_path = askdirectory()
         if save_path:
-            self.controller.make_splash(text='Saving images...')
-            self.controller.image_editor.image.save_cuts(path=save_path)
-            self.controller.stop_splash()
-            self.controller.image_editor.stop_animation()
-            self.controller.remove_temp_dirs()
-            self.controller.frames['ImageSelector'].re_init()
-            self.controller.show_frame('ImageSelector')
+            ok_save = self.check_paths(save_path)
+            if ok_save:
+                self.controller.make_splash(text='Saving images...')
+                self.controller.image_editor.image.save_cuts(path=save_path)
+                self.controller.stop_splash()
+                self.controller.image_editor.stop_animation()
+                self.controller.remove_temp_dirs()
+                self.controller.frames['ImageSelector'].re_init()   # don't need to do this?
+                self.controller.show_frame('ImageSelector')
 
 
 
 
 # functions
+
+def check_memmap(data):
+    refs = gc.get_referrers(*[data])
+    print("{} referrers: [{}]".format(len(refs),' ,'.join([str(type(r)) for r in refs])))
+    for r in refs:
+        if type(r) is type(sys._getframe()):
+            print('FRAME: {}'.format(inspect.getframeinfo(r)))
 
 def get_label(attr_name):
     if attr_name == 'dose':
@@ -829,7 +911,12 @@ def log_temp_dir(directory):
 
 
 def exit_fn(app):
-    app.image_editor.stop_animation()
+    if app.image_editor is not None:
+        app.image_editor.stop_animation()
+        if app.image_editor.image is not None:
+            for i,cut in enumerate(app.image_editor.image.cuts):
+                del cut.img_data
+            del app.image_editor.image.img_data
     app.destroy()
     del app
     gc.collect()
@@ -849,7 +936,6 @@ def print_error(e):
 if __name__ == "__main__":
     gc.collect()
     clean_temp_dirs()
-    # atexit.register(exit_fn)
     data_folder = os.path.join('data','pcds')
     app = ImageGUI(folder=data_folder)
     app.protocol("WM_DELETE_WINDOW", lambda app=app:exit_fn(app))
