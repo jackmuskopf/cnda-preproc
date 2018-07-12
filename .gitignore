@@ -16,3 +16,4 @@ dist/
 .ipynb_checkpoints/
 
 templog.txt
+stack_report.txt

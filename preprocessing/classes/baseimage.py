@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import warnings
 
+
 from pprint import pprint
 import inspect
 
@@ -290,7 +291,7 @@ class BaseImage:
         return
 
 
-    def save_cuts(self,path):
+    def save_cut(self,index,path):
 
         def add_animal_number(hdr_lines,animal_number):
             for i,line in enumerate(hdr_lines):
@@ -351,50 +352,63 @@ class BaseImage:
         hdr_file = open(self.header_file, 'r')
         hdr_string = hdr_file.read()
         hdr_lines = hdr_string.split('\n')
-        for i,cut_img in enumerate(self.cuts):
+
+
+        '''
+        Might need to be careful of aliasing, memory, memmaps here.  will image be flipped if saving is interrupted
+        by overwrite warning on a cut besides the first?
+        '''
+
+        cut_img = self.cuts[index]
             
-            # did this when reading image data, flip it back now
-            cut_img.rotate_on_axis('x')
-            
-            # update header variables
-            cut_hdr_lines = hdr_lines
-            vars_to_update = ['x_dimension','y_dimension','z_dimension','dose','subject_weight','injection_time']
-            for v in vars_to_update:
-                cut_hdr_lines = change_line(cut_hdr_lines,v,str(getattr(cut_img.params,v)))
-            
-            # add animal_number to header information if it has been set
-            animal_number = cut_img.params.animal_number
-            if animal_number.strip():
-                cut_hdr_lines = add_animal_number(cut_hdr_lines,animal_number)
+        # did this when reading image data, flip it back now
+        cut_img.rotate_on_axis('x')
+        
+        # update header variables
+        cut_hdr_lines = hdr_lines
+        vars_to_update = ['x_dimension','y_dimension','z_dimension','dose','subject_weight','injection_time']
+        for v in vars_to_update:
+            cut_hdr_lines = change_line(cut_hdr_lines,v,str(getattr(cut_img.params,v)))
+        
+        # add animal_number to header information if it has been set
+        animal_number = cut_img.params.animal_number
+        if animal_number.strip():
+            cut_hdr_lines = add_animal_number(cut_hdr_lines,animal_number)
 
 
-            cut_filename = cut_img.filename
-            cut_hdr_name = cut_filename+'.hdr'
-            cut_hdr_str = '\n'.join(cut_hdr_lines)
+        cut_filename = cut_img.filename
+        cut_hdr_name = cut_filename+'.hdr'
+        cut_hdr_str = '\n'.join(cut_hdr_lines)
 
-            with open(os.path.join(path,cut_hdr_name),'w') as hf:
-                hf.write(cut_hdr_str)
+        with open(os.path.join(path,cut_hdr_name),'w') as hf:
+            hf.write(cut_hdr_str)
 
-            out_data = cut_img.img_data
-            out_data = out_data.reshape(cut_img.xdim*cut_img.ydim*cut_img.zdim,cut_img.nframes)
-            # out_data.resize((cut_img.xdim*cut_img.ydim*cut_img.zdim,cut_img.nframes),refcheck=False)
-            if self.scaled:
-                inv = lambda x: 1/x
-                v_inv = np.vectorize(inv)
-                inv_scale_factor = v_inv(self.scale_factor)
-                out_data = out_data*inv_scale_factor
+        out_data = cut_img.img_data
+        out_data = out_data.reshape(cut_img.xdim*cut_img.ydim*cut_img.zdim,cut_img.nframes)
 
-            # prepare data to write out
-            out_data = out_data.swapaxes(0,1).flatten()
-            
-            # make sure data is int if it is supposed to be
-            if sf in ['i','B','h']:
-                out_data = out_data.astype(int)
+        if self.scaled:
+            inv = lambda x: 1/x
+            v_inv = np.vectorize(inv)
+            inv_scale_factor = v_inv(self.scale_factor)
+            out_data = out_data*inv_scale_factor
 
-            with open(os.path.join(path,cut_filename),'wb') as dfile:
-                write_chunks(out_data,dfile)
-                # dfile.write(struct.pack(nd*sf,*out_data))
-            print('File saved.')
+        # prepare data to write out
+        out_data = out_data.swapaxes(0,1).flatten()
+        
+        # make sure data is int if it is supposed to be
+        if sf in ['i','B','h']:
+            out_data = out_data.astype(int)
+
+        with open(os.path.join(path,cut_filename),'wb') as dfile:
+            write_chunks(out_data,dfile)
+            # dfile.write(struct.pack(nd*sf,*out_data))
+        print('File saved.')
+
+        # clean up after myself.
+        cut_img.rotate_on_axis('x')
+        out_data = None
+        gc.collect()
+
 
     def clean_cuts(self):
         '''
@@ -538,7 +552,7 @@ class PETImage(BaseImage):
                 'injection_time']
         self.integers = ['data_type','z_dimension','total_frames','x_dimension','y_dimension']
         self.per_frame = ['scale_factor','frame_duration'] 
-        self.strings = ['injection_time']
+        self.strings = ['injection_time','animal_number','subject_weight','dose']
 
 
         self.header_file = filepath+'.hdr'
@@ -586,7 +600,7 @@ class CTImage(BaseImage):
 
         self.integers = ['data_type','z_dimension','total_frames','x_dimension','y_dimension']
         self.per_frame = ['scale_factor','frame_duration'] 
-        self.strings = []
+        self.strings = ['injection_time','animal_number','subject_weight','dose']
         self.load_header()
         self.xdim = self.params.x_dimension
         self.ydim = self.params.y_dimension

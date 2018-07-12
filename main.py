@@ -28,7 +28,7 @@ def check_img_data(ie):
         print('No img_data')
 
 class SplashScreen(tk.Toplevel):
-    def __init__(self, parent, text, yn=False):
+    def __init__(self, parent, text):
         self.__name__ = 'LoadScreen'
         tk.Toplevel.__init__(self, parent)
         self.parent = parent
@@ -49,22 +49,55 @@ class SplashScreen(tk.Toplevel):
         self.title("Image Preprocessing")
 
         # size buttons
-        sz = 18 if not yn else 11
-        label = tk.Label(self, text=text, font=tkfont.Font(family='Helvetica', size=sz, weight="bold", slant="italic"))
+        label = tk.Label(self, text=text, font=tkfont.Font(family='Helvetica', size=18, weight="bold", slant="italic"))
         label.pack(side="top", fill="x", pady=10)
 
-        if yn:
-            tk.Button(self, text="Yes",command=lambda:self.return_yn(True)).pack(side=tk.RIGHT, fill="x", padx=(0,120))
-            tk.Button(self, text="No",command=lambda:self.return_yn(False)).pack(side=tk.LEFT, fill="x", padx=(120,0))
-        
         ## required to make window show before the program gets to the mainloop
         self.update()
 
 
-    def return_yn(self,yn):
-        print('Setting splash_yn: {}'.format(yn))
-        self.parent.splash_yn = yn
-        self.parent.stop_splash()
+class YesNoPopup(tk.Toplevel):
+    def __init__(self, parent, text):
+        self.__name__ = 'LoadScreen'
+        tk.Toplevel.__init__(self, parent)
+        self.parent = parent
+        w = 530 # width for the Tk root
+        h = 250 # height for the Tk root
+
+        # get screen width and height
+        ws = self.winfo_screenwidth() # width of the screen
+        hs = self.winfo_screenheight() # height of the screen
+
+        # calculate x and y coordinates for the Tk root window
+        x = (ws/2) - (w/2)
+        y = (hs/2) - (h/2)
+
+        # set the dimensions of the screen 
+        # and where it is placed
+        self.geometry('%dx%d+%d+%d' % (w, h, x, y))
+        self.title("Image Preprocessing")
+
+        # text
+        label = tk.Label(self, text=text, font=tkfont.Font(family='Helvetica', size=10))
+        label.pack(side="top", fill="x", pady=10)
+
+        # yes/no buttons
+        self.ans = tk.BooleanVar()
+        self.yes = tk.Button(self, text='Yes', command=lambda:self.ans.set(True))
+        self.yes.pack(side="right", pady=10, padx=(0,100))
+        self.no = tk.Button(self, text='No', command=lambda:self.ans.set(False))
+        self.no.pack(side="left", pady=10, padx=(100,0))
+
+
+        ## required to make window show before the program gets to the mainloop
+        self.update()
+
+
+    def get_ans(self):
+        self.yes.wait_variable(self.ans)
+        return self.ans.get()
+
+
 
 
 
@@ -118,9 +151,6 @@ class ImageGUI(tk.Tk):
         # attribute to hold which frame was raised last
         self.last_frame = None
 
-        # attribute to hold result from splash y/n var
-        self.splash_yn = None
-
         # title font var
         self.title_font = tkfont.Font(family='Helvetica', size=18, weight="bold", slant="italic")
 
@@ -168,17 +198,30 @@ class ImageGUI(tk.Tk):
         self.raised_frame = frame.__name__
         frame.tkraise()
 
+        print("stack size: {}".format(len(traceback.extract_stack())))
+        tb = '\n'.join([str(r) for r in traceback.extract_stack()])
+        txt = '\n'.join([
+            '\n','\n','#'*50,
+            'Showing frame: {}'.format(page_name),'\n'
+            ])
+        txt += tb
+        with open('stack_report.txt','a') as myf:
+            myf.write(txt)
+
+        if self.image_editor:
+            self.image_editor.stop_animation()
+
         try:
             frame.re_init()
         except AttributeError as e:
             print_error(e)
 
-    def make_splash(self,text='Loading...',yn=False):
+    def make_splash(self,SplashObj=SplashScreen,text='Loading...'):
         self.withdraw()
-        self.splash = SplashScreen(self,text=text,yn=yn)
+        return SplashObj(self,text=text)
 
-    def stop_splash(self):
-        self.splash.destroy()
+    def stop_splash(self,SplashObj):
+        SplashObj.destroy()
         self.deiconify()
 
     def load_image(self):
@@ -189,11 +232,11 @@ class ImageGUI(tk.Tk):
 
 
     def start_img(self,img):
-        self.make_splash()       
+        loadscreen = self.make_splash(SplashObj=SplashScreen,text='Loading...')       
         self.image_editor = ImageEditor(img,escale=self.escale)
         self.load_image()
         self.tempdirs.append(self.image_editor.image.tempdir)
-        self.stop_splash()
+        self.stop_splash(loadscreen)
         self.show_frame("ImageRotator")
 
     def init_escaler(self, frame):
@@ -308,6 +351,7 @@ class ImageSelector(tk.Frame):
         for b in self.buttons:
             b.destroy()
         self.make_buttons()
+        gc.collect()
 
     def make_buttons(self):
         img_pairs = self.controller.get_files()
@@ -512,7 +556,11 @@ class ImageCutter(tk.Frame):
         self.controller.init_img_info(self)
         self.controller.view_ax = 'z'
         self.controller.init_escaler(self)
+        traceback.print_stack()
+        print("stack size: {}".format(len(traceback.extract_stack())))
+        gc.collect()
         self.init_ani()
+
 
     def back(self):
         self.controller.image_editor.stop_animation()
@@ -726,6 +774,8 @@ class HeaderUI(tk.Frame):
                 _ = getattr(self.cut.params,attr)
                 if _ is not None:
                     getattr(self,attr).set(_)
+                else:
+                    getattr(self,attr).set('')
 
         self.filename.set(self.cut.filename)
 
@@ -824,17 +874,17 @@ class ConfirmSave(tk.Frame):
         self.controller.image_editor.stop_animation()
         self.controller.show_frame('HeaderUI')
 
-    def check_paths(self, path):
-        new_files = [os.path.join(path,cut.filename) for cut in self.controller.image_editor.image.cuts]
-        for f in new_files:
-            overwrite = [tf for tf in (f,f+'.hdr') if os.path.exists(tf)]
-            if overwrite:
-                ow_msg = '\n'.join(['The following files will be overwritten:']+overwrite+['Do you want to continue?'])
-                self.controller.make_splash(text=ow_msg, yn=True)
-                print('Returning {}'.format(self.controller.splash_yn))
-                return self.controller.splash_yn
-            else:
-                return True
+    def check_path(self, path):
+        overwrite = [tf for tf in (path,path+'.hdr') if os.path.exists(tf)]
+        if overwrite:
+            ow_msg = '\n'.join(['The following files will be overwritten:']+overwrite+['Do you want to continue?'])
+            ynpopup = self.controller.make_splash(SplashObj=YesNoPopup,text=ow_msg)
+            yes_no = ynpopup.get_ans()
+            self.controller.stop_splash(ynpopup)
+            print('Returning {}'.format(yes_no))
+            return yes_no
+        else:
+            return True
 
 
 
@@ -843,11 +893,25 @@ class ConfirmSave(tk.Frame):
         Tk().withdraw()
         save_path = askdirectory()
         if save_path:
-            ok_save = self.check_paths(save_path)
-            if ok_save:
-                self.controller.make_splash(text='Saving images...')
-                self.controller.image_editor.image.save_cuts(path=save_path)
-                self.controller.stop_splash()
+            '''
+            I think order should be preserved here.  
+            That is important for the ok_save check to match which file we are saving
+            '''
+            not_saved = []
+            new_files = [os.path.join(save_path,cut.filename) for cut in self.controller.image_editor.image.cuts]
+            for i,filepath in enumerate(new_files):
+                ok_save = self.check_path(filepath)
+                if ok_save:
+                    savescreen = self.controller.make_splash(SplashObj=SplashScreen,text='Saving image...')
+                    self.controller.image_editor.image.save_cut(index=i,path=save_path)
+                    self.controller.stop_splash(savescreen)
+                else:
+                    not_saved.append(1)
+
+            # if any not saved, might need to revise filepath, don't reset.
+            if not_saved:
+                pass
+            else:
                 self.controller.image_editor.stop_animation()
                 self.controller.remove_temp_dirs()
                 self.controller.frames['ImageSelector'].re_init()   # don't need to do this?
@@ -898,6 +962,11 @@ def clean_temp_dirs():
         with open(TEMPLOG,'w') as tlog:
             tlog.write('\n'.join(tdirs))
 
+def stop_app():
+    global app
+    for frame in app.frames.values():
+        frame.destroy()
+    app.destroy()
 
 def log_temp_dir(directory):
     if os.path.exists(TEMPLOG):
@@ -937,6 +1006,7 @@ if __name__ == "__main__":
     gc.collect()
     clean_temp_dirs()
     data_folder = os.path.join('data','pcds')
-    app = ImageGUI(folder=data_folder)
-    app.protocol("WM_DELETE_WINDOW", lambda app=app:exit_fn(app))
-    app.mainloop()
+    while True:
+        app = ImageGUI(folder=data_folder)
+        app.protocol("WM_DELETE_WINDOW", lambda app=app:exit_fn(app))
+        app.mainloop()

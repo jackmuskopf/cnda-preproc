@@ -77,9 +77,9 @@ class ImageViewer:
 		xmat = getattr(frame,self.collapse)(axis=self.image.get_axis('x')).swapaxes(0,1)
 		ymat = getattr(frame,self.collapse)(axis=self.image.get_axis('y'))
 		zmat = getattr(frame,self.collapse)(axis=self.image.get_axis('z'))
-		xmat = xmat*(self.escale/xmat.max())
-		ymat = ymat*(self.escale/ymat.max())
-		zmat = zmat*(self.escale/zmat.max())
+		xmat = normalize(xmat)*(self.escale)
+		ymat = normalize(ymat)*(self.escale)
+		zmat = normalize(zmat)*(self.escale)
 
 		# plot with control
 		ax_title = {0:'x axis', 1:'y axis', 2:'z axis'}
@@ -99,7 +99,7 @@ class ImageViewer:
 		self.check_frames()
 		view_ax = self.image.get_axis(view_ax)
 		frames = np.take(self.image.img_data, slice_ix, view_ax)
-		frames = self.escale*frames/frames.max()
+		frames = self.escale*normalize(frames)
 		frames = self.image.split_on_axis(frames,2)
 		if self.is_x(view_ax):
 			frames = self.swap_x(frames)
@@ -114,7 +114,11 @@ class ImageViewer:
 		view_ax = self.image.get_axis(view_ax)
 		f1,f2 = self.image.frame_range
 		mats = [self.image.collapse_frame(axis=view_ax,frame=ix,method=self.collapse) for ix in range(f1,f2+1)]
-		scale = self.escale/np.array(mats).max()
+		
+		# careful dividing, always
+		max_val = np.array(mats).max()
+		max_val = max_val if not_zero(max_val) else 1
+		scale = self.escale/max_val
 		mats = [m*scale for m in mats]
 		if self.is_x(view_ax):
 			mats = self.swap_x(mats)
@@ -130,8 +134,7 @@ class ImageViewer:
 		if frame is None:
 			frame = self.image.frame_range[0]
 		frame_mat = self.image.get_frame(frame)
-		scale = self.escale/frame_mat.max()
-		frame_mat = frame_mat*scale
+		frame_mat = normalize(frame_mat)*self.escale
 		mats = self.image.split_on_axis(frame_mat, axis)
 		
 		if get_mats:
@@ -201,9 +204,9 @@ class ImageViewer:
 		gc.collect()
 
 		# normalize blocks
-		xblock = (self.escale/xblock.max())*xblock
-		yblock = (self.escale/yblock.max())*yblock
-		zblock = (self.escale/zblock.max())*zblock
+		xblock = (self.escale)*normalize(xblock)
+		yblock = (self.escale)*normalize(yblock)
+		zblock = (self.escale)*normalize(zblock)
 
 		# split into list of matrices
 		xmats = self.image.split_on_axis(xblock,2)
@@ -498,11 +501,16 @@ class ImageEditor(ImageViewer):
 		# for splitting collapsed data into frames
 		split_frames = lambda x: self.image.split_on_axis(x,2)
 		
+		# get the data
 		fdata = self.image.img_data	# free this
 		axis = self.image.get_axis(view_ax)
 		fdata = getattr(fdata,self.collapse)(axis=axis)
-		scale = self.escale/fdata.max()
+
+		# always careful division
+		max_val = fdata.max()
+		scale = self.escale/max_val if not_zero(max_val) else self.escale
 		fdata = fdata*scale
+
 		fmats = split_frames(fdata)
 		nframes = len(fmats)
 		fdata = None # freed
@@ -625,3 +633,14 @@ class ImageEditor(ImageViewer):
 		plt.show()
 
 		
+# functions
+
+def not_zero(val):
+	return abs(val)>10**-100
+
+def normalize(nparray):
+	max_val = nparray.max()
+	if not_zero(max_val):
+		return nparray/max_val
+	else:
+		return nparray
