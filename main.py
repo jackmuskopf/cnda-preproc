@@ -101,10 +101,10 @@ class YesNoPopup(tk.Toplevel):
 
 
 
-class ImageGUI(tk.Tk):
+class ImageGUI(ImageEditor):
 
-    def __init__(self, folder='data'):
-        tk.Tk.__init__(self)
+    def __init__(self, folder='data', image=None, nmice=None, collapse='max', escale=14.0):
+        ImageEditor.__init__(self, image=image, nmice=nmice, collapse=collapse, escale=escale)
         self.__name__ = 'ImageGUI'
         self.title("Image Preprocessing")
         w = 500 # width for the Tk root
@@ -124,7 +124,6 @@ class ImageGUI(tk.Tk):
 
         self.img_type = None
         self.filepath = None
-        self.image_editor = None
         self.nmice = None
         self.folder = folder.strip('/').strip('\\').strip()
         self.tempdirs = []
@@ -198,18 +197,17 @@ class ImageGUI(tk.Tk):
         self.raised_frame = frame.__name__
         frame.tkraise()
 
-        print("stack size: {}".format(len(traceback.extract_stack())))
-        tb = '\n'.join([str(r) for r in traceback.extract_stack()])
-        txt = '\n'.join([
-            '\n','\n','#'*50,
-            'Showing frame: {}'.format(page_name),'\n'
-            ])
-        txt += tb
-        with open('stack_report.txt','a') as myf:
-            myf.write(txt)
+        # print("stack size: {}".format(len(traceback.extract_stack())))
+        # tb = '\n'.join([str(r) for r in traceback.extract_stack()])
+        # txt = '\n'.join([
+        #     '\n','\n','#'*50,
+        #     'Showing frame: {}'.format(page_name),'\n'
+        #     ])
+        # txt += tb
+        # with open('stack_report.txt','a') as myf:
+        #     myf.write(txt)
 
-        if self.image_editor:
-            self.image_editor.stop_animation()
+        self.stop_animation()
 
         try:
             frame.re_init()
@@ -227,15 +225,16 @@ class ImageGUI(tk.Tk):
     def load_image(self):
         tdir = tempfile.mkdtemp()
         log_temp_dir(tdir)
-        self.image_editor.image.tempdir = tdir
-        self.image_editor.image.load_image()
+        self.image.tempdir = tdir
+        self.image.load_image()
+        self.update_dims()
 
 
     def start_img(self,img):
         loadscreen = self.make_splash(SplashObj=SplashScreen,text='Loading...')       
-        self.image_editor = ImageEditor(img,escale=self.escale)
+        self.image = img
         self.load_image()
-        self.tempdirs.append(self.image_editor.image.tempdir)
+        self.tempdirs.append(self.image.tempdir)
         self.stop_splash(loadscreen)
         self.show_frame("ImageRotator")
 
@@ -266,14 +265,12 @@ class ImageGUI(tk.Tk):
             except ValueError:
                 print('Cannot interpret input {} exposure scale as a float.'.format(frame.str_scale.get()))
                 return
-            if self.image_editor is not None:
-                self.image_editor.escale = self.escale
 
 
     def get_img_info(self,frame):
-        fname = self.image_editor.image.filename
+        fname = self.image.filename
         nmice = self.nmice if self.nmice is not None else '?'
-        z,y,x,frames = self.image_editor.image.img_data.shape
+        z,y,x,frames = self.image.img_data.shape
         text = '\n'.join(['File : {}'.format(fname),
                         'Number of frames : {}'.format(frames),
                         'Frame dimensions : ({0}, {1}, {2})'.format(x,y,z),
@@ -301,18 +298,17 @@ class ImageGUI(tk.Tk):
                 print('Failed to remove tempdir: {0}\n{1}'.format(directory,e))
         
     def clean_memmaps(self):
-        if self.image_editor is not None:
-            if self.image_editor.image is not None:
-                self.image_editor.image.clean_cuts()
-                try:
-                    delattr(self.image_editor.image,'img_data')
-                except AttributeError:
-                    pass
-                fn = '{}.dat'.format(self.image_editor.image.filename.split('.')[0])
-                fp = os.path.join(self.image_editor.image.tempdir,fn)
-                if os.path.exists(fp):
-                    os.remove(fp)
-        self.image_editor = None
+        if self.image is not None:
+            self.image.clean_cuts()
+            try:
+                delattr(self.image,'img_data')
+            except AttributeError:
+                pass
+            fn = '{}.dat'.format(self.image.filename.split('.')[0])
+            fp = os.path.join(self.image.tempdir,fn)
+            if os.path.exists(fp):
+                os.remove(fp)
+        self.image = None
         gc.collect()
 
 
@@ -460,28 +456,28 @@ class ImageRotator(tk.Frame):
             self.R3.place(x=self.rbx,y=self.rby+40)
 
     def back(self):
-        self.controller.image_editor.stop_animation()
+        self.controller.stop_animation()
         self.controller.show_frame('ImageSelector')
 
     def animate_axes(self):
-        self.controller.image_editor.stop_animation()
-        self.controller.image_editor.animate_axes()
+        self.controller.stop_animation()
+        self.controller.animate_axes()
 
     def rotate_on_axis(self,ax):
-        self.controller.image_editor.image.rotate_on_axis(ax)
+        self.controller.image.rotate_on_axis(ax)
         self.animate_axes()
 
     def next_page(self):
-        if self.controller.image_editor.nmice is not None:
-            self.controller.image_editor.stop_animation()
-            if self.controller.image_editor.nmice == 1:
+        if self.controller.nmice is not None:
+            self.controller.stop_animation()
+            if self.controller.nmice == 1:
                 self.controller.view_ax = 'x'
-                im = self.controller.image_editor.image
+                im = self.controller.image
                 fpcs = im.filename.split('.')
                 if not fpcs[0].endswith('_s1'):
                     fpcs[0]+='_s1'
-                self.controller.image_editor.image.filename = '.'.join(fpcs)
-                self.controller.image_editor.image.cuts = [self.controller.image_editor.image] #[SubImage(parent_image=im,img_data=im.img_data,filename='.'.join(fpcs))]
+                self.controller.image.filename = '.'.join(fpcs)
+                self.controller.image.cuts = [self.controller.image] #[SubImage(parent_image=im,img_data=im.img_data,filename='.'.join(fpcs))]
                 self.controller.show_frame('CutViewer')
             else:
                 self.controller.show_frame('ImageCutter')
@@ -492,7 +488,7 @@ class ImageRotator(tk.Frame):
     def set_nmice(self):
         nmice = self.tknmice.get()
         if nmice is not None:
-            self.controller.image_editor.nmice = self.tknmice.get()
+            self.controller.nmice = self.tknmice.get()
             self.controller.nmice = self.tknmice.get()
 
     def nmice_warn(self):
@@ -548,7 +544,7 @@ class ImageCutter(tk.Frame):
         # viewz = tk.Button(self,text="View collapsed z-axis",command=lambda:self.change_ax('z')).place(x=vbx,y=vby+30)
         
     def recenter(self):
-        self.controller.image_editor.cx, self.controller.image_editor.cy = self.controller.image_editor.cx_def, self.controller.image_editor.cy_def
+        self.controller.cx, self.controller.cy = self.controller.cx_def, self.controller.cy_def
         self.init_ani()
 
 
@@ -563,26 +559,26 @@ class ImageCutter(tk.Frame):
 
 
     def back(self):
-        self.controller.image_editor.stop_animation()
+        self.controller.stop_animation()
         self.controller.show_frame('ImageRotator')
 
     def init_ani(self):
         self.start_cutter()
 
     def start_cutter(self):
-        self.controller.image_editor.stop_animation()
-        self.controller.image_editor.animated_cutter(view_ax=self.controller.view_ax)
+        self.controller.stop_animation()
+        self.controller.animated_cutter(view_ax=self.controller.view_ax)
 
     def change_ax(self,ax):
         self.controller.view_ax = ax
         self.start_cutter()
 
     def set_cutter(self,cutter):
-        self.controller.image_editor.cutter=cutter
+        self.controller.cutter=cutter
         self.re_init()
 
     def do_cut(self):
-        self.controller.image_editor.cut_image()
+        self.controller.cut_image()
         self.controller.show_frame('CutViewer')
 
 
@@ -628,22 +624,22 @@ class CutViewer(tk.Frame):
         self.animate_cuts()
 
     def back(self):
-        self.controller.image_editor.stop_animation()
-        if self.controller.image_editor.nmice == 1:
+        self.controller.stop_animation()
+        if self.controller.nmice == 1:
             self.controller.show_frame('ImageRotator')
         else:
             self.controller.show_frame('ImageCutter')
 
     def next(self):
-        self.controller.image_editor.stop_animation()
+        self.controller.stop_animation()
         self.controller.show_frame('HeaderUI')
 
     def animate_cuts(self):
-        self.controller.image_editor.stop_animation()
-        if self.controller.image_editor.nmice == 1:
-            self.controller.image_editor.animate_collapse(self.controller.view_ax)
+        self.controller.stop_animation()
+        if self.controller.nmice == 1:
+            self.controller.animate_collapse(self.controller.view_ax)
         else:
-            self.controller.image_editor.animate_cuts(view_ax=self.controller.view_ax)
+            self.controller.animate_cuts(view_ax=self.controller.view_ax)
 
     def change_ax(self,ax):
         self.controller.view_ax = ax
@@ -682,19 +678,19 @@ class HeaderUI(tk.Frame):
 
     def re_init(self):
         self.reset_attrs()
-        self.cut_ix = 0 if self.controller.last_frame == 'CutViewer' else len(self.controller.image_editor.image.cuts)-1
+        self.cut_ix = 0 if self.controller.last_frame == 'CutViewer' else len(self.controller.image.cuts)-1
         
         # coords for placing entry boxes and labels
         self.er,self.ec = 1,1
         self.hdr_attrs = ['filename','animal_number','subject_weight']
 
         # input file info
-        if self.controller.image_editor.image.type == 'ct':
+        if self.controller.image.type == 'ct':
             pass
-        elif self.controller.image_editor.image.type == 'pet':
+        elif self.controller.image.type == 'pet':
             self.hdr_attrs += ['dose','injection_time']
         else:
-            raise ValueError('Unexpected image type: {}'.format(self.controller.image_editor.image.type))
+            raise ValueError('Unexpected image type: {}'.format(self.controller.image.type))
 
 
         try:
@@ -726,7 +722,7 @@ class HeaderUI(tk.Frame):
         self.next_button = tk.Button(self, text="Next",command=self.increment_cut)
         self.next_button.place(x=nbbx+180,y=nbby)
 
-        self.cut = self.controller.image_editor.image.cuts[0]
+        self.cut = self.controller.image.cuts[0]
         self.init_cut()
 
 
@@ -741,13 +737,13 @@ class HeaderUI(tk.Frame):
     def increment_cut(self):
         self.update_cut()
         self.cut_ix += 1
-        if self.cut_ix < len(self.controller.image_editor.image.cuts):
+        if self.cut_ix < len(self.controller.image.cuts):
             self.update_title()
-            self.cut = self.controller.image_editor.image.cuts[self.cut_ix]
+            self.cut = self.controller.image.cuts[self.cut_ix]
             self.init_cut()
         else:
             self.destroy_buttons()
-            self.controller.image_editor.stop_animation()
+            self.controller.stop_animation()
             self.reset_attrs()
             self.controller.show_frame('ConfirmSave')
 
@@ -755,7 +751,7 @@ class HeaderUI(tk.Frame):
     def decrement_cut(self):
         self.cut_ix -= 1
         self.update_title()
-        self.cut = self.controller.image_editor.image.cuts[self.cut_ix]
+        self.cut = self.controller.image.cuts[self.cut_ix]
         self.init_cut()
 
 
@@ -764,8 +760,8 @@ class HeaderUI(tk.Frame):
         self.init_ani()
 
     def init_ani(self):
-        self.controller.image_editor.stop_animation()
-        self.ie = ImageEditor(self.cut, escale=self.controller.image_editor.escale)
+        self.controller.stop_animation()
+        self.ie = ImageEditor(self.cut, escale=self.controller.escale)
         self.ie.animate_axes()
 
     def init_entries(self):
@@ -811,7 +807,7 @@ class HeaderUI(tk.Frame):
             self.decrement_cut()
         else:
             self.destroy_buttons()
-            self.controller.image_editor.stop_animation()
+            self.controller.stop_animation()
             self.reset_attrs()
             self.controller.show_frame('CutViewer')
 
@@ -835,7 +831,7 @@ class ConfirmSave(tk.Frame):
         label.grid(row=0,column=0,columnspan=2,padx=(30,0),pady=(0,20))        
 
         params_to_display = ['animal_number','injection_time','dose','subject_weight','filename']
-        for i,cut in enumerate(self.controller.image_editor.image.cuts):
+        for i,cut in enumerate(self.controller.image.cuts):
             for j,param in enumerate(params_to_display):
                 jx=j+1
                 if param == 'filename':
@@ -863,7 +859,7 @@ class ConfirmSave(tk.Frame):
         self.init_ani()
 
     def init_ani(self):
-        self.controller.image_editor.animate_cuts()
+        self.controller.animate_cuts()
 
 
     def clear_widgets(self):
@@ -871,7 +867,7 @@ class ConfirmSave(tk.Frame):
             widget.destroy()
 
     def back(self):
-        self.controller.image_editor.stop_animation()
+        self.controller.stop_animation()
         self.controller.show_frame('HeaderUI')
 
     def check_path(self, path):
@@ -898,12 +894,12 @@ class ConfirmSave(tk.Frame):
             That is important for the ok_save check to match which file we are saving
             '''
             not_saved = []
-            new_files = [os.path.join(save_path,cut.filename) for cut in self.controller.image_editor.image.cuts]
+            new_files = [os.path.join(save_path,cut.filename) for cut in self.controller.image.cuts]
             for i,filepath in enumerate(new_files):
                 ok_save = self.check_path(filepath)
                 if ok_save:
                     savescreen = self.controller.make_splash(SplashObj=SplashScreen,text='Saving image...')
-                    self.controller.image_editor.image.save_cut(index=i,path=save_path)
+                    self.controller.image.save_cut(index=i,path=save_path)
                     self.controller.stop_splash(savescreen)
                 else:
                     not_saved.append(1)
@@ -912,7 +908,7 @@ class ConfirmSave(tk.Frame):
             if not_saved:
                 pass
             else:
-                self.controller.image_editor.stop_animation()
+                self.controller.stop_animation()
                 self.controller.remove_temp_dirs()
                 self.controller.frames['ImageSelector'].re_init()   # don't need to do this?
                 self.controller.show_frame('ImageSelector')
@@ -980,12 +976,11 @@ def log_temp_dir(directory):
 
 
 def exit_fn(app):
-    if app.image_editor is not None:
-        app.image_editor.stop_animation()
-        if app.image_editor.image is not None:
-            for i,cut in enumerate(app.image_editor.image.cuts):
-                del cut.img_data
-            del app.image_editor.image.img_data
+    app.stop_animation()
+    if app.image is not None:
+        for i,cut in enumerate(app.image.cuts):
+            del cut.img_data
+        del app.image.img_data
     app.destroy()
     del app
     gc.collect()

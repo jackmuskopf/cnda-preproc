@@ -1,22 +1,20 @@
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import matplotlib.gridspec as gridspec
+import tkinter as tk
 import numpy as np
 import warnings
 import gc
 from .baseimage import PETImage, SubImage
 
-class ImageViewer:
+class ImageViewer(tk.Tk):
 
 	def __init__(self, image=None, collapse='max', escale=1.0, interval=100):
-		self.image = image    # data_handler.MyImage superclass
+		tk.Tk.__init__(self)
+		self.image = image  
 
 		# toggle for animation
 		self.pause = False
-
-		# cut coords (only used in ImageEditor)
-		self.cx_def,self.cy_def = int(round(self.image.xdim/2)),int(round(self.image.ydim/2))
-		self.cx,self.cy = self.cx_def,self.cy_def
 
 		# scaling to use when displaying images
 		self.escale = escale
@@ -25,6 +23,13 @@ class ImageViewer:
 		self.collapse = collapse
 
 		self.interval = interval
+
+	def update_dims(self):
+
+		# cut coords (only used in ImageEditor)
+		self.cx_def,self.cy_def = int(round(self.image.xdim/2)),int(round(self.image.ydim/2))
+		self.cx,self.cy = self.cx_def,self.cy_def
+
 
 	def is_x(self,ax):
 		return [k for k,v in self.image.ax_map.items() if v==ax][0]=='x'
@@ -256,8 +261,8 @@ class ImageViewer:
 
 class ImageEditor(ImageViewer):
 
-	def __init__(self, image, nmice=None, collapse='max', escale=1.0):
-		ImageViewer.__init__(self, image, collapse=collapse, escale=escale)
+	def __init__(self, image=None, nmice=None, collapse='max', escale=1.0):
+		ImageViewer.__init__(self, image=image, collapse=collapse, escale=escale)
 
 		# for displaying cut
 		self.nmice = nmice
